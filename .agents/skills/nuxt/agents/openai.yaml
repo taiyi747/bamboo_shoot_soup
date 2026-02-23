@@ -1,0 +1,4 @@
+interface:
+  display_name: "Nuxt"
+  short_description: "Use official Nuxt docs from llms.txt for precise guidance"
+  default_prompt: "Use $nuxt to answer with version-aware Nuxt guidance and source links."
