@@ -1,6 +1,6 @@
 # Bamboo Shoot Soup Backend Scaffold
 
-This directory contains the MVP backend scaffold using FastAPI, SQLAlchemy, Alembic, and SQLite.
+This repository contains an MVP backend scaffold using FastAPI, SQLAlchemy, Alembic, and SQLite.
 
 ## Prerequisites
 
