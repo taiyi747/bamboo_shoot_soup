@@ -1,0 +1,4 @@
+interface:
+  display_name: "Nuxt UI"
+  short_description: "Use official Nuxt UI docs from llms.txt"
+  default_prompt: "Use $nuxt-ui to answer with Nuxt UI component and theming guidance plus source links."
