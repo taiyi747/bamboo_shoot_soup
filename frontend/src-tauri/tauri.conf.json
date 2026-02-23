@@ -6,15 +6,17 @@
   "build": {
     "frontendDist": "../.output/public",
     "devUrl": "http://127.0.0.1:3000",
-    "beforeDevCommand": "bun run dev",
+    "beforeDevCommand": "bun run dev:mobile",
     "beforeBuildCommand": "bun run generate"
   },
   "app": {
     "windows": [
       {
         "title": "Bamboo Shoot Soup",
-        "width": 800,
-        "height": 600,
+        "width": 1280,
+        "height": 860,
+        "minWidth": 960,
+        "minHeight": 680,
         "resizable": true,
         "fullscreen": false
       }

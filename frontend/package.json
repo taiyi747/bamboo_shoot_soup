@@ -6,20 +6,40 @@
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev --host 127.0.0.1 --port 3000",
+    "dev:mobile": "nuxt dev --host 0.0.0.0 --port 3000",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
+    "typecheck": "nuxt typecheck",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:nuxt": "vitest run --project nuxt",
+    "test:e2e": "vitest run --project e2e",
     "postinstall": "nuxt prepare",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "tauri:android:init": "tauri android init",
+    "tauri:android:dev": "tauri android dev",
+    "tauri:android:build": "tauri android build",
+    "tauri:ios:init": "bun scripts/tauri-mobile.mjs ios init",
+    "tauri:ios:dev": "bun scripts/tauri-mobile.mjs ios dev",
+    "tauri:ios:build": "bun scripts/tauri-mobile.mjs ios build"
   },
   "dependencies": {
+    "@nuxt/ui": "^4.4.0",
     "@tauri-apps/api": "^2.10.0",
     "nuxt": "^4.3.1",
+    "tailwindcss": "^4.2.1",
     "vue": "^3.5.28",
-    "vue-router": "^5.0.3"
+    "vue-router": "^5.0.3",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.10.0"
+    "@nuxt/test-utils": "^4.0.0",
+    "@tauri-apps/cli": "^2.10.0",
+    "@vue/test-utils": "^2.4.6",
+    "happy-dom": "^20.7.0",
+    "playwright-core": "^1.58.2",
+    "vitest": "^4.0.18"
   }
 }

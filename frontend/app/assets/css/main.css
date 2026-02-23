@@ -1,0 +1,80 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+:root {
+  --app-max-width: 1100px;
+  --app-shell-pad: 1rem;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html,
+body,
+#__nuxt {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: "Manrope", "IBM Plex Sans", "Segoe UI", sans-serif;
+  background:
+    radial-gradient(1200px 500px at -10% -10%, rgb(255 228 196 / 70%), transparent 60%),
+    radial-gradient(1000px 500px at 120% 0%, rgb(190 242 100 / 35%), transparent 55%),
+    linear-gradient(160deg, #f7f7f2 0%, #ecf3ef 100%);
+  color: rgb(26 33 37);
+}
+
+a {
+  text-decoration: none;
+}
+
+.app-shell {
+  max-width: var(--app-max-width);
+  margin: 0 auto;
+  padding: calc(var(--safe-top) + 0.75rem) var(--app-shell-pad) calc(var(--safe-bottom) + 1rem);
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgb(255 255 255 / 86%);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgb(15 23 42 / 8%);
+  border-radius: 18px;
+  padding: 0.9rem;
+}
+
+.step-nav {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.main-panel {
+  margin-top: 1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.surface-card {
+  border: 1px solid rgb(15 23 42 / 8%);
+  border-radius: 18px;
+  background: rgb(255 255 255 / 88%);
+}
+
+.touch-target {
+  min-height: 44px;
+}
+
+@media (max-width: 960px) {
+  .step-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-shell {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+}
