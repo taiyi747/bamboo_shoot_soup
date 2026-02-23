@@ -1,4 +1,3 @@
-export type Stage = 'CURRENT' | 'MVP' | 'V1' | 'V2'
 export type RiskTolerance = 'low' | 'medium' | 'high'
 
 export interface OnboardingInput {
@@ -99,7 +98,6 @@ export interface AnalyticsEventPayload {
   eventName: AnalyticsEventName
   userId: string
   timestamp: string
-  stage: Stage
   identityId?: string
   metadata?: Record<string, unknown>
 }

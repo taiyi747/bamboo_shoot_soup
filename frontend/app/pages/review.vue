@@ -18,7 +18,6 @@ const exportJson = () => {
 
   const payload = JSON.stringify(
     {
-      stage: state.value.events.at(-1)?.stage ?? 'CURRENT',
       profile: state.value.profile,
       primaryIdentity: selectedPrimaryModel.value,
       backupIdentity: selectedBackupModel.value,
@@ -132,7 +131,6 @@ const startOver = async () => {
           <thead>
             <tr class="border-b border-slate-200 text-slate-600">
               <th class="py-2">事件名</th>
-              <th class="py-2">阶段</th>
               <th class="py-2">时间</th>
               <th class="py-2">身份 ID</th>
             </tr>
@@ -144,7 +142,6 @@ const startOver = async () => {
               class="border-b border-slate-100 text-slate-700"
             >
               <td class="py-2">{{ event.eventName }}</td>
-              <td class="py-2">{{ event.stage }}</td>
               <td class="py-2">{{ event.timestamp }}</td>
               <td class="py-2">{{ event.identityId || '-' }}</td>
             </tr>

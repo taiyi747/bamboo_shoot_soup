@@ -1,5 +1,5 @@
 import { useApiClient } from '../services/api/client'
-import type { AnalyticsEventName, AnalyticsEventPayload, Stage } from '../types/flow'
+import type { AnalyticsEventName, AnalyticsEventPayload } from '../types/flow'
 
 const buildUserId = () => {
   if (globalThis.crypto?.randomUUID) {
@@ -12,7 +12,6 @@ export const useAnalytics = () => {
   const { state } = useMvpFlow()
   const api = useApiClient()
   const userId = useState<string>('mvp-user-id', buildUserId)
-  const stage = useState<Stage>('analytics-stage', () => 'CURRENT')
 
   const track = async (
     eventName: AnalyticsEventName,
@@ -23,7 +22,6 @@ export const useAnalytics = () => {
       eventName,
       userId: userId.value,
       timestamp: new Date().toISOString(),
-      stage: stage.value,
       identityId,
       metadata,
     }
