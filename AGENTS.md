@@ -2,7 +2,7 @@
 
 本文件用于约束本仓库中 AI/开发者协作方式，目标是让实现过程稳定、可复现、可测试。
 
-产品说明与业务规格已迁移到 `product-spec.md`。
+产品说明与业务规格位于 `product-spec.md`。
 
 ## 1. 代码规范
 
@@ -32,7 +32,7 @@ tests/
 
 ## 3. 里程碑建议
 
-1. `Milestone 1`: 数据模型 + CRUD + SQLite 仓储。
+1. `Milestone 1`: 数据模型 + CRUD + PostgreSQL 仓储。
 2. `Milestone 2`: 倒计时/状态/临期筛选 + 单元测试。
 3. `Milestone 3`: 图片识别接入 + 人工确认流。
 4. `Milestone 4`: MCP tool 对外发布 + 文档完善。
