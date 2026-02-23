@@ -1,6 +1,26 @@
-# Frontend (Nuxt 4 + Tauri 2)
+# Frontend (Nuxt 4 + Nuxt UI + Tauri 2)
 
-本目录使用 `Nuxt 4` 作为前端 UI，`Tauri 2` 作为桌面容器。
+本目录实现 Bamboo Shoot Soup 的 MVP 前端流程（M0-M3）：
+
+- Onboarding 诊断
+- 身份模型生成与主/备选择
+- 人格宪法
+- 7-Day Launch Kit
+- 一致性检查
+- MVP 汇总页
+
+默认运行模式：
+
+- API：`mock`
+- Stage：`MVP`
+- API Base：`http://127.0.0.1:8000`（`http` 模式下生效）
+
+## 环境要求
+
+- Bun 1.3+
+- Rust / Cargo（Tauri）
+- Android Studio + SDK（仅 Android 移动容器）
+- Xcode（仅 macOS，iOS 移动容器）
 
 ## 安装依赖
 
@@ -8,7 +28,7 @@
 bun install
 ```
 
-## 仅前端开发
+## 前端开发
 
 ```bash
 bun run dev
@@ -16,18 +36,91 @@ bun run dev
 
 默认地址：`http://127.0.0.1:3000`
 
-## 桌面开发模式
+移动端容器联调建议使用：
+
+```bash
+bun run dev:mobile
+```
+
+## 切换 API 模式
+
+新建或修改 `frontend/.env`：
+
+```bash
+NUXT_PUBLIC_API_MODE=mock
+NUXT_PUBLIC_API_BASE=http://127.0.0.1:8000
+```
+
+- `mock`：前端内置 Mock 数据（默认）
+- `http`：调用后端接口
+
+## 桌面端（Tauri）
+
+开发：
 
 ```bash
 bun run tauri:dev
 ```
 
-会先执行 `bun run dev`，再启动 Tauri 窗口。
-
-## 桌面构建
+构建：
 
 ```bash
 bun run tauri:build
 ```
 
-会先执行 `bun run generate`，并将 Nuxt 静态产物（`.output/public`）打包到桌面应用。
+## 移动端（Tauri Mobile）
+
+Android 初始化：
+
+```bash
+bun run tauri:android:init
+```
+
+Android 调试：
+
+```bash
+bun run tauri:android:dev
+```
+
+Android 构建：
+
+```bash
+bun run tauri:android:build
+```
+
+iOS 初始化（仅 macOS）：
+
+```bash
+bun run tauri:ios:init
+```
+
+iOS 调试（仅 macOS）：
+
+```bash
+bun run tauri:ios:dev
+```
+
+iOS 构建（仅 macOS）：
+
+```bash
+bun run tauri:ios:build
+```
+
+说明：
+
+- Windows 环境下 iOS 命令无法执行，属平台限制，不作为 MVP 阻断项。
+- 移动端验收口径为“工程可编排”，即命令链路和代码适配到位，不强制真机全覆盖。
+
+## 测试
+
+```bash
+bun run test
+```
+
+分项目执行：
+
+```bash
+bun run test:unit
+bun run test:nuxt
+bun run test:e2e
+```
