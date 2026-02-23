@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useApiClient } from '../services/api/client'
-import type { PersonaConstitution } from '../types/mvp'
+import type { PersonaConstitution } from '../types/flow'
 
 const api = useApiClient()
 const { state, selectedPrimaryModel } = useMvpFlow()
@@ -84,7 +84,7 @@ if (state.value.persona) {
   <UCard class="surface-card">
     <template #header>
       <h2 class="text-xl font-semibold text-slate-900">
-        M2 人格宪法
+        人格宪法
       </h2>
       <p class="mt-1 text-sm text-slate-600">
         编辑并固化口吻词典、观点护城河、叙事主线与成长 Arc。

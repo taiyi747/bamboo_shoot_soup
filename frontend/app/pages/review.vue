@@ -10,7 +10,7 @@ const exportJson = () => {
   if (!hasCoreArtifacts.value) {
     toast.add({
       title: '导出失败',
-      description: '请先完成 MVP 主流程后再导出。',
+      description: '请先完成主流程后再导出。',
       color: 'error',
     })
     return
@@ -18,7 +18,7 @@ const exportJson = () => {
 
   const payload = JSON.stringify(
     {
-      stage: 'MVP',
+      stage: state.value.events.at(-1)?.stage ?? 'CURRENT',
       profile: state.value.profile,
       primaryIdentity: selectedPrimaryModel.value,
       backupIdentity: selectedBackupModel.value,
@@ -35,13 +35,13 @@ const exportJson = () => {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `bss-mvp-review-${Date.now()}.json`
+  link.download = `bss-identity-review-${Date.now()}.json`
   link.click()
   URL.revokeObjectURL(url)
 
   toast.add({
     title: '导出完成',
-    description: 'MVP 汇总 JSON 已生成。',
+    description: '交付汇总 JSON 已生成。',
     color: 'success',
   })
 }
@@ -56,7 +56,7 @@ const startOver = async () => {
   <UCard class="surface-card">
     <template #header>
       <h2 class="text-xl font-semibold text-slate-900">
-        MVP 汇总与交付预览
+        交付汇总预览
       </h2>
       <p class="mt-1 text-sm text-slate-600">
         对齐 product-spec 最小交付：主身份模型 + 人格宪法 + 7-Day Launch Kit + 风险边界提醒。
@@ -74,7 +74,7 @@ const startOver = async () => {
 
     <div class="mb-4 flex flex-wrap gap-3">
       <UButton class="touch-target" :disabled="!hasCoreArtifacts" @click="exportJson">
-        导出 MVP 汇总 JSON
+        导出交付汇总 JSON
       </UButton>
       <UButton color="neutral" variant="outline" class="touch-target" @click="startOver">
         重新开始流程
@@ -124,7 +124,7 @@ const startOver = async () => {
     <UCard class="surface-card mt-4">
       <template #header>
         <h3 class="text-base font-semibold text-slate-900">
-          事件埋点（MVP）
+          事件埋点
         </h3>
       </template>
       <div class="overflow-auto">

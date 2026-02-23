@@ -79,7 +79,7 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
         </UButton>
         <NuxtLink to="/review">
           <UButton color="neutral" variant="outline" class="touch-target" :disabled="!state.consistencyCheck">
-            前往 MVP 汇总
+            前往交付汇总
           </UButton>
         </NuxtLink>
       </div>

@@ -35,7 +35,7 @@ const generateLaunchKit = async () => {
   <UCard class="surface-card">
     <template #header>
       <h2 class="text-xl font-semibold text-slate-900">
-        M3 7-Day Launch Kit
+        7-Day Launch Kit
       </h2>
       <p class="mt-1 text-sm text-slate-600">
         自动生成 7 天主题、草稿骨架、可持续栏目与增长实验建议。

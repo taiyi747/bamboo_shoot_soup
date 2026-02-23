@@ -1,19 +1,20 @@
 # Frontend (Nuxt 4 + Nuxt UI + Tauri 2)
 
-本目录实现 Bamboo Shoot Soup 的 MVP 前端流程（M0-M3）：
+本目录实现 Bamboo Shoot Soup 的前端主流程：
 
 - Onboarding 诊断
 - 身份模型生成与主/备选择
 - 人格宪法
 - 7-Day Launch Kit
 - 一致性检查
-- MVP 汇总页
+- 交付汇总页
 
 默认运行模式：
 
 - API：`mock`
-- Stage：`MVP`
 - API Base：`http://127.0.0.1:8000`（`http` 模式下生效）
+
+内部实现边界仍对齐 `docs/product-spec.md` 的 MVP 范围，但不在用户界面显式展示阶段标签。
 
 ## 环境要求
 
@@ -108,7 +109,7 @@ bun run tauri:ios:build
 
 说明：
 
-- Windows 环境下 iOS 命令无法执行，属平台限制，不作为 MVP 阻断项。
+- Windows 环境下 iOS 命令无法执行，属平台限制，不作为当前前端交付阻断项。
 - 移动端验收口径为“工程可编排”，即命令链路和代码适配到位，不强制真机全覆盖。
 
 ## 测试
