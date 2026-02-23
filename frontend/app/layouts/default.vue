@@ -3,12 +3,12 @@ const route = useRoute()
 const { state } = useMvpFlow()
 
 const steps = [
-  { to: '/onboarding', label: 'M0 诊断' },
-  { to: '/identity-models', label: 'M1 身份模型' },
-  { to: '/persona-constitution', label: 'M2 人格宪法' },
-  { to: '/launch-kit', label: 'M3 启动包' },
+  { to: '/onboarding', label: '身份诊断' },
+  { to: '/identity-models', label: '身份模型' },
+  { to: '/persona-constitution', label: '人格宪法' },
+  { to: '/launch-kit', label: '启动包' },
   { to: '/consistency-check', label: '一致性检查' },
-  { to: '/review', label: 'MVP 汇总' },
+  { to: '/review', label: '交付汇总' },
 ]
 
 const canVisit = (to: string) => {
@@ -28,15 +28,12 @@ const canVisit = (to: string) => {
       <div class="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p class="text-xs font-semibold tracking-[0.18em] text-slate-600">
-            BAMBOO SHOOT SOUP / MVP
+            BAMBOO SHOOT SOUP
           </p>
           <h1 class="text-lg font-semibold text-slate-900">
             职场创作者身份设计工作台
           </h1>
         </div>
-        <UBadge color="neutral" variant="subtle">
-          Stage: MVP
-        </UBadge>
       </div>
 
       <nav class="step-nav">

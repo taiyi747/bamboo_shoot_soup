@@ -1,5 +1,5 @@
 import type { ApiClient, RunConsistencyCheckRequest } from './types'
-import type { GrowthArcItem, IdentityModelCard, OnboardingProfile } from '../../types/mvp'
+import type { GrowthArcItem, IdentityModelCard, OnboardingProfile } from '../../types/flow'
 
 const pause = (ms = 180) => new Promise(resolve => setTimeout(resolve, ms))
 

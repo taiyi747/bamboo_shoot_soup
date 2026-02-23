@@ -2,7 +2,7 @@
 import { z } from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import { useApiClient } from '../services/api/client'
-import type { OnboardingInput } from '../types/mvp'
+import type { OnboardingInput } from '../types/flow'
 
 const api = useApiClient()
 const { track } = useAnalytics()
@@ -85,7 +85,7 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
   <UCard class="surface-card">
     <template #header>
       <h2 class="text-xl font-semibold text-slate-900">
-        M0 身份诊断
+        身份诊断
       </h2>
       <p class="mt-1 text-sm text-slate-600">
         为职场创作者采集六类维度：技能栈、兴趣能量、认知风格、价值边界、风险承受度、时间投入。

@@ -1,4 +1,4 @@
-import type { IdentityModelCard, MvpFlowState } from '../types/mvp'
+import type { IdentityModelCard, MvpFlowState } from '../types/flow'
 
 const defaultInput = () => ({
   skills: [] as string[],

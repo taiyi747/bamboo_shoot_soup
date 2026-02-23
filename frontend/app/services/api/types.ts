@@ -6,7 +6,7 @@ import type {
   OnboardingInput,
   OnboardingProfile,
   PersonaConstitution,
-} from '../../types/mvp'
+} from '../../types/flow'
 
 export interface CreateOnboardingSessionRequest {
   targetPersona: 'career_creator'

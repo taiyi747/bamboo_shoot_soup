@@ -8,7 +8,6 @@ export default defineNuxtConfig({
     public: {
       apiMode: 'mock',
       apiBase: 'http://127.0.0.1:8000',
-      stage: 'MVP',
     },
   },
   typescript: {

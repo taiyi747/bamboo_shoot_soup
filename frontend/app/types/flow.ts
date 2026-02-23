@@ -1,4 +1,4 @@
-export type Stage = 'MVP' | 'V1' | 'V2'
+export type Stage = 'CURRENT' | 'MVP' | 'V1' | 'V2'
 export type RiskTolerance = 'low' | 'medium' | 'high'
 
 export interface OnboardingInput {

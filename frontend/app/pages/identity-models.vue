@@ -86,7 +86,7 @@ const saveSelection = async () => {
   <UCard class="surface-card">
     <template #header>
       <h2 class="text-xl font-semibold text-slate-900">
-        M1 身份模型生成与选择
+        身份模型生成与选择
       </h2>
       <p class="mt-1 text-sm text-slate-600">
         系统将生成 3 个候选身份模型，支持主/备身份选择并做强规则校验。
