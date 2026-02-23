@@ -176,8 +176,8 @@ MVP 最小交付：
 
 ### 技术栈
 
-- Backend：`FastAPI`（Python）
-- Frontend：`Tauri v2 + Nuxt 4`
+- Backend：`FastAPI + SQLAlchemy + Alembic`（Python）
+- Frontend：`Tauri v2 + Nuxt 4`（包管理与脚本运行：`bun`）
 - Persistence：`SQLite`
 - Communication：`HTTP localhost`
 - Runtime：`Desktop-first (Local-first)`
@@ -230,8 +230,8 @@ MVP 最小交付：
 
 当前仓库以产品与业务规格文档为主，尚处于实现前准备阶段。建议按以下顺序推进：
 
-1. 建立后端骨架（FastAPI + SQLite + 领域模型）
-2. 建立桌面端骨架（Tauri v2 + Nuxt 4）
+1. 建立后端骨架（FastAPI + SQLAlchemy + Alembic + SQLite + 领域模型）
+2. 建立桌面端骨架（Tauri v2 + Nuxt 4 + bun）
 3. 打通 MVP 主流程（诊断 -> 身份生成 -> 启动包 -> 一致性检查）
 4. 接入指标埋点与验收看板
 

@@ -94,8 +94,10 @@
 
 | 维度 | 基线选型 | 说明 |
 | --- | --- | --- |
-| Backend | `FastAPI`（Python） | FastAPI 0.x 主线，Pydantic v2 生态 |
+| Backend API | `FastAPI`（Python） | FastAPI 0.x 主线，Pydantic v2 生态 |
+| Backend Data | `SQLAlchemy + Alembic` | ORM + 迁移管理（MVP 默认） |
 | Frontend | `Tauri v2 + Nuxt 4` | 桌面端 UI |
+| Frontend Toolchain | `bun` | 前端依赖安装与脚本执行默认工具 |
 | Persistence | `SQLite`（MVP） | 默认本地持久化 |
 | Communication | `HTTP localhost` | 前端通过本地 HTTP API 调后端 |
 | Runtime Mode | `Desktop-first (Local-first)` | 本地桌面优先 |
@@ -103,13 +105,16 @@
 ### 4.2 Runtime Topology Contract
 
 - `FastAPI` 作为本地服务进程启动。
+- 后端数据访问层默认使用 `SQLAlchemy`，数据库版本演进默认使用 `Alembic`。
 - `Tauri + Nuxt` 作为本地桌面前端，调用 `http://127.0.0.1:<port>`。
+- 前端默认使用 `bun` 执行依赖安装与脚本命令。
 - 端口允许配置化，但必须支持探测与重试。
 - 当前不以云端部署为默认路径。
 
 ### 4.3 一致性规则（硬约束）
 
 - 不接受 `Electron`、`Flask`、`Django` 作为默认替代。
+- 不接受以 `npm` / `yarn` / `pnpm` 作为默认前端工具链口径（文档默认口径为 `bun`）。
 - 不接受 `invoke-only` 作为默认前后端通信。
 - 不接受 `JSON 文件` 作为默认持久化。
 
@@ -122,7 +127,7 @@
 
 ## 6. 维护机制
 
-- 当前版本：`v1.1`
+- 当前版本：`v1.2`
 - 触发更新条件：
   - `docs/product-spec.md` 结构或口径变化
   - 技术栈默认基线变化
