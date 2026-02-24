@@ -66,10 +66,11 @@ class _LaunchKitOutput(BaseModel):
 
 
 LAUNCH_KIT_PROMPT = """
-You are generating a 7-day launch kit JSON for a creator.
-Return strict JSON only with this shape:
+你是一名内容增长策略助手，需要为创作者生成 7 天启动包 JSON。
+只返回严格 JSON 对象，不要输出 Markdown、解释、注释或代码块。
+输出必须严格符合以下结构（字段名不可修改、不可新增）：
 {
-  "sustainable_columns": ["string", "... at least 3 items"],
+  "sustainable_columns": ["string", "... 至少 3 项"],
   "growth_experiment_suggestion": [
     {
       "name": "string",
@@ -88,23 +89,26 @@ Return strict JSON only with this shape:
     }
   ]
 }
-Hard constraints:
-- include exactly 7 days
-- day_no must be unique from 1 to 7
-- each day must include non-empty: day_no, theme, draft_or_outline, opening_text
-- no markdown
-- no extra keys
-- self-check before returning:
-  - verify days length == 7
-  - verify all day_no values are exactly 1..7 with no duplicates
-  - verify every day has draft_or_outline
+硬约束：
+- 必须包含且仅包含 7 条 days
+- day_no 必须唯一，且完整覆盖 1..7
+- 每个 day 必须且仅可包含 day_no、theme、draft_or_outline、opening_text
+- theme、draft_or_outline、opening_text 必须为非空字符串
+- sustainable_columns 至少 3 项，且每项为非空字符串
+- growth_experiment_suggestion 至少 1 项
+返回前自检：
+1) days 长度是否为 7
+2) day_no 是否恰好为 1..7 且无重复
+3) 每个 day 是否都包含 draft_or_outline 且非空
 """.strip()
 
 LAUNCH_KIT_REPAIR_PROMPT = """
-You are repairing an invalid JSON object for a 7-day launch kit output.
-Return strict JSON only with this exact shape:
+你正在修复一个不合法的 7 天启动包 JSON。
+你会收到 original_user_payload、previous_invalid_response、validation_error。
+只返回修复后的严格 JSON 对象，不要输出 Markdown、解释、注释或代码块。
+输出必须严格符合以下结构（字段名不可修改、不可新增）：
 {
-  "sustainable_columns": ["string", "... at least 3 items"],
+  "sustainable_columns": ["string", "... 至少 3 项"],
   "growth_experiment_suggestion": [
     {
       "name": "string",
@@ -123,14 +127,13 @@ Return strict JSON only with this exact shape:
     }
   ]
 }
-Hard constraints:
-- include exactly 7 days
-- day_no must be unique and cover 1..7
-- each day must include non-empty: day_no, theme, draft_or_outline, opening_text
-- sustainable_columns must have at least 3 items
-- growth_experiment_suggestion must have at least 1 item
-- no markdown
-- no extra keys
+硬约束：
+- 必须包含且仅包含 7 条 days
+- day_no 必须唯一且完整覆盖 1..7
+- 每个 day 必须且仅可包含 day_no、theme、draft_or_outline、opening_text
+- theme、draft_or_outline、opening_text 必须为非空字符串
+- sustainable_columns 至少 3 项，且每项为非空字符串
+- growth_experiment_suggestion 至少 1 项
 """.strip()
 
 

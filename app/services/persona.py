@@ -40,8 +40,8 @@ class _PersonaConstitutionOutput(BaseModel):
 
 
 PERSONA_CONSTITUTION_PROMPT = """
-You are generating a persona constitution JSON for a creator.
-Return strict JSON only with this shape:
+你正在为创作者生成人设宪法 JSON。
+请仅返回严格 JSON，结构如下：
 {
   "common_words": ["string", "... at least 3 items"],
   "forbidden_words": ["string", "... at least 3 items"],
@@ -50,10 +50,10 @@ Return strict JSON only with this shape:
   "narrative_mainline": "string",
   "growth_arc_template": "string"
 }
-Hard constraints:
-- no markdown
-- no extra keys
-- all string fields must be non-empty
+硬性约束：
+- 不要 markdown
+- 不要额外字段
+- 所有字符串字段都必须非空
 """.strip()
 
 

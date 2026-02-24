@@ -8,7 +8,10 @@ from typing import Any
 from pydantic import BaseModel, ValidationError, model_validator
 from sqlalchemy.orm import Session
 
+from app.models.consistency_check import ConsistencyCheck
 from app.models.identity_model import IdentityModel, IdentitySelection
+from app.models.launch_kit import LaunchKit
+from app.models.persona import PersonaConstitution, RiskBoundaryItem
 from app.services.llm_client import get_llm_client, llm_schema_error
 
 
@@ -77,9 +80,13 @@ Hard constraints:
 - differentiation must be non-empty.
 - tone_examples must contain at least 5 entries.
 - long_term_views must contain 5-10 entries.
+- risk_boundary must be a JSON array of non-empty strings, never a plain string.
+- if only one risk boundary is generated, still return it as an array with one item.
 - no markdown, no prose, no extra keys.
+- self-check before returning:
+  - every models[i].risk_boundary is an array type
+  - every item in models[i].risk_boundary is a non-empty string
 """.strip()
-
 
 def _parse_identity_models(payload: dict[str, Any], count: int) -> list[_IdentityCandidate]:
     """校验 LLM 响应并强制候选数量与请求一致。"""
@@ -99,6 +106,47 @@ def _parse_identity_models(payload: dict[str, Any], count: int) -> list[_Identit
     return result.models
 
 
+def _replace_user_identity_models(db: Session, user_id: str) -> None:
+    """Replace all identity models for a user and unlink old downstream references."""
+    existing_model_ids = [
+        model_id
+        for (model_id,) in db.query(IdentityModel.id).filter(IdentityModel.user_id == user_id).all()
+    ]
+    if not existing_model_ids:
+        return
+
+    db.query(IdentitySelection).filter(IdentitySelection.user_id == user_id).delete(
+        synchronize_session=False
+    )
+
+    db.query(PersonaConstitution).filter(
+        PersonaConstitution.identity_model_id.in_(existing_model_ids)
+    ).update({PersonaConstitution.identity_model_id: None}, synchronize_session=False)
+
+    db.query(RiskBoundaryItem).filter(
+        RiskBoundaryItem.identity_model_id.in_(existing_model_ids)
+    ).update(
+        {RiskBoundaryItem.identity_model_id: None},
+        synchronize_session=False,
+    )
+
+    db.query(LaunchKit).filter(LaunchKit.identity_model_id.in_(existing_model_ids)).update(
+        {LaunchKit.identity_model_id: None},
+        synchronize_session=False,
+    )
+
+    db.query(ConsistencyCheck).filter(
+        ConsistencyCheck.identity_model_id.in_(existing_model_ids)
+    ).update(
+        {ConsistencyCheck.identity_model_id: None},
+        synchronize_session=False,
+    )
+
+    db.query(IdentityModel).filter(IdentityModel.id.in_(existing_model_ids)).delete(
+        synchronize_session=False
+    )
+
+
 def generate_identity_models(
     db: Session,
     user_id: str,
@@ -107,13 +155,21 @@ def generate_identity_models(
     count: int = 3,
 ) -> list[IdentityModel]:
     """
-    Generate 3-5 identity models via LLM.
+    # 任务：生成人格模型
 
-    Per product-spec 2.6 business rules:
-    - differentiation must be non-empty
-    - tone_examples must have at least 5 sentences
-    - long_term_views must have 5-10 items
-    - monetization_validation_order must have at least 1 step
+    **任务目标：**
+    请生成 3-5 个不同的**人格模型（Identity Models）**。
+
+    **输出要求：**
+    所有生成的内容必须使用**中文**，且每个模型必须严格遵守产品说明书 2.6 的业务规则：
+
+    1. **差异化定位 (Differentiation)**：必须提供明确的定位说明，内容不得为空。
+    2. **语气示例 (Tone Examples)**：必须提供至少 5 句代表该人格说话风格的例句。
+    3. **长期愿景 (Long-term Views)**：必须列出 5-10 项具体的长期观点或发展目标。
+    4. **变现验证流程 (Monetization Validation Order)**：必须包含至少 1 个具体的变现验证步骤。
+
+    **输出格式：**
+    请使用清晰的 Markdown 结构（标题、列表等）输出每一个模型的信息。
     """
     llm_payload = {
         "user_id": user_id,
@@ -130,6 +186,7 @@ def generate_identity_models(
     )
     # 第二步：先做 schema/业务规则校验，再进入落库。
     candidates = _parse_identity_models(response_payload, count=count)
+    _replace_user_identity_models(db, user_id)
 
     # 第三步：将校验后的结构映射到 ORM 模型。
     models: list[IdentityModel] = []
@@ -208,7 +265,12 @@ def select_identity(
 
 def get_user_identity_models(db: Session, user_id: str) -> list[IdentityModel]:
     """Get all identity models for a user."""
-    return db.query(IdentityModel).filter(IdentityModel.user_id == user_id).all()
+    return (
+        db.query(IdentityModel)
+        .filter(IdentityModel.user_id == user_id)
+        .order_by(IdentityModel.created_at.asc(), IdentityModel.id.asc())
+        .all()
+    )
 
 
 def get_identity_model(db: Session, model_id: str) -> IdentityModel | None:

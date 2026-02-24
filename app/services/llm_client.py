@@ -47,6 +47,7 @@ class LLMServiceError(RuntimeError):
 
 def llm_schema_error(operation: str, message: str) -> LLMServiceError:
     """构造统一的 schema 校验错误，供路由层转为 502。"""
+
     return LLMServiceError(
         code="LLM_SCHEMA_VALIDATION_FAILED",
         message=message,

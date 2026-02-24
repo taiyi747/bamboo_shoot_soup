@@ -8,6 +8,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.db.base import Base
+from app.models.consistency_check import ConsistencyCheck
+from app.models.identity_model import IdentityModel, IdentitySelection
+from app.models.launch_kit import LaunchKit
+from app.models.persona import PersonaConstitution, RiskBoundaryItem
 from app.models.user import User
 from app.services import consistency_check as consistency_service
 from app.services import identity_model as identity_service
@@ -89,6 +93,52 @@ def _invalid_launch_kit_payload_missing_outline() -> dict:
     return payload
 
 
+def _identity_models_payload(prefix: str) -> dict:
+    return {
+        "models": [
+            {
+                "title": f"{prefix} A",
+                "target_audience_pain": "Pain A",
+                "content_pillars": ["P1", "P2", "P3"],
+                "tone_keywords": ["k1", "k2"],
+                "tone_examples": ["e1", "e2", "e3", "e4", "e5"],
+                "long_term_views": ["v1", "v2", "v3", "v4", "v5"],
+                "differentiation": f"{prefix} Diff A",
+                "growth_path_0_3m": "Plan A1",
+                "growth_path_3_12m": "Plan A2",
+                "monetization_validation_order": ["m1"],
+                "risk_boundary": ["r1"],
+            },
+            {
+                "title": f"{prefix} B",
+                "target_audience_pain": "Pain B",
+                "content_pillars": ["P1", "P2", "P3"],
+                "tone_keywords": ["k1", "k2"],
+                "tone_examples": ["e1", "e2", "e3", "e4", "e5"],
+                "long_term_views": ["v1", "v2", "v3", "v4", "v5"],
+                "differentiation": f"{prefix} Diff B",
+                "growth_path_0_3m": "Plan B1",
+                "growth_path_3_12m": "Plan B2",
+                "monetization_validation_order": ["m1"],
+                "risk_boundary": ["r1"],
+            },
+            {
+                "title": f"{prefix} C",
+                "target_audience_pain": "Pain C",
+                "content_pillars": ["P1", "P2", "P3"],
+                "tone_keywords": ["k1", "k2"],
+                "tone_examples": ["e1", "e2", "e3", "e4", "e5"],
+                "long_term_views": ["v1", "v2", "v3", "v4", "v5"],
+                "differentiation": f"{prefix} Diff C",
+                "growth_path_0_3m": "Plan C1",
+                "growth_path_3_12m": "Plan C2",
+                "monetization_validation_order": ["m1"],
+                "risk_boundary": ["r1"],
+            },
+        ]
+    }
+
+
 def test_generate_identity_models_persists_count(monkeypatch, tmp_path) -> None:
     db, user_id = _make_db_session(tmp_path)
     payload = {
@@ -147,6 +197,131 @@ def test_generate_identity_models_persists_count(monkeypatch, tmp_path) -> None:
 
     assert len(models) == 3
     assert all(model.differentiation for model in models)
+    prompt = fake_client.calls[0]["system_prompt"]
+    assert "risk_boundary must be a JSON array of non-empty strings, never a plain string." in prompt
+    assert "every models[i].risk_boundary is an array type" in prompt
+    _close_db(db)
+
+
+def test_generate_identity_models_replaces_previous_batch(monkeypatch, tmp_path) -> None:
+    db, user_id = _make_db_session(tmp_path)
+    fake_client = _FakeLLMClient(
+        {
+            "generate_identity_models": [
+                _identity_models_payload("Batch1"),
+                _identity_models_payload("Batch2"),
+            ]
+        }
+    )
+    monkeypatch.setattr(identity_service, "get_llm_client", lambda: fake_client)
+
+    first_batch = identity_service.generate_identity_models(
+        db=db,
+        user_id=user_id,
+        session_id=None,
+        capability_profile={"skill_stack": ["python"]},
+        count=3,
+    )
+    first_ids = {model.id for model in first_batch}
+    second_batch = identity_service.generate_identity_models(
+        db=db,
+        user_id=user_id,
+        session_id=None,
+        capability_profile={"skill_stack": ["python"]},
+        count=3,
+    )
+    current_models = identity_service.get_user_identity_models(db, user_id)
+
+    second_ids = {model.id for model in second_batch}
+    current_ids = {model.id for model in current_models}
+
+    assert len(current_models) == 3
+    assert current_ids == second_ids
+    assert first_ids.isdisjoint(current_ids)
+    assert all(model.title.startswith("Batch2") for model in current_models)
+    _close_db(db)
+
+
+def test_generate_identity_models_clears_previous_selection_and_unlinks_dependencies(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    db, user_id = _make_db_session(tmp_path)
+    fake_client = _FakeLLMClient(
+        {
+            "generate_identity_models": [
+                _identity_models_payload("Batch1"),
+                _identity_models_payload("Batch2"),
+            ]
+        }
+    )
+    monkeypatch.setattr(identity_service, "get_llm_client", lambda: fake_client)
+
+    first_batch = identity_service.generate_identity_models(
+        db=db,
+        user_id=user_id,
+        session_id=None,
+        capability_profile={"skill_stack": ["python"]},
+        count=3,
+    )
+
+    identity_service.select_identity(
+        db=db,
+        user_id=user_id,
+        primary_identity_id=first_batch[0].id,
+        backup_identity_id=first_batch[1].id,
+    )
+
+    constitution = PersonaConstitution(user_id=user_id, identity_model_id=first_batch[0].id)
+    boundary = RiskBoundaryItem(user_id=user_id, identity_model_id=first_batch[0].id)
+    launch_kit = LaunchKit(user_id=user_id, identity_model_id=first_batch[0].id)
+    check = ConsistencyCheck(
+        user_id=user_id,
+        identity_model_id=first_batch[0].id,
+        draft_text="test draft",
+    )
+    db.add_all([constitution, boundary, launch_kit, check])
+    db.commit()
+
+    constitution_id = constitution.id
+    boundary_id = boundary.id
+    launch_kit_id = launch_kit.id
+    check_id = check.id
+    old_ids = {model.id for model in first_batch}
+
+    second_batch = identity_service.generate_identity_models(
+        db=db,
+        user_id=user_id,
+        session_id=None,
+        capability_profile={"skill_stack": ["python"]},
+        count=3,
+    )
+    second_ids = {model.id for model in second_batch}
+
+    remaining_old_count = (
+        db.query(IdentityModel).filter(IdentityModel.id.in_(old_ids)).count()
+    )
+    selection_count = db.query(IdentitySelection).filter(IdentitySelection.user_id == user_id).count()
+    refreshed_constitution = (
+        db.query(PersonaConstitution).filter(PersonaConstitution.id == constitution_id).first()
+    )
+    refreshed_boundary = db.query(RiskBoundaryItem).filter(RiskBoundaryItem.id == boundary_id).first()
+    refreshed_launch_kit = db.query(LaunchKit).filter(LaunchKit.id == launch_kit_id).first()
+    refreshed_check = db.query(ConsistencyCheck).filter(ConsistencyCheck.id == check_id).first()
+    current_models = identity_service.get_user_identity_models(db, user_id)
+
+    assert len(second_batch) == 3
+    assert remaining_old_count == 0
+    assert selection_count == 0
+    assert refreshed_constitution is not None
+    assert refreshed_boundary is not None
+    assert refreshed_launch_kit is not None
+    assert refreshed_check is not None
+    assert refreshed_constitution.identity_model_id is None
+    assert refreshed_boundary.identity_model_id is None
+    assert refreshed_launch_kit.identity_model_id is None
+    assert refreshed_check.identity_model_id is None
+    assert {model.id for model in current_models} == second_ids
     _close_db(db)
 
 
@@ -183,6 +358,9 @@ def test_generate_launch_kit_creates_7_days(monkeypatch, tmp_path) -> None:
     assert kit.id is not None
     assert len(kit.days) == 7
     assert [day.day_no for day in kit.days] == [1, 2, 3, 4, 5, 6, 7]
+    prompt = fake_client.calls[0]["system_prompt"]
+    assert "需要为创作者生成 7 天启动包 JSON" in prompt
+    assert "只返回严格 JSON 对象" in prompt
     _close_db(db)
 
 
@@ -301,6 +479,7 @@ def test_generate_launch_kit_retries_schema_then_succeeds(monkeypatch, tmp_path)
     assert kit.id is not None
     assert len(kit.days) == 7
     assert len([c for c in fake_client.calls if c["operation"] == "generate_launch_kit"]) == 2
+    assert "你正在修复一个不合法的 7 天启动包 JSON" in fake_client.calls[1]["system_prompt"]
     _close_db(db)
 
 
