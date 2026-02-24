@@ -158,6 +158,38 @@ const toStringArray = (value: unknown): string[] => {
     .filter(Boolean)
 }
 
+const parseToneExamples = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return toStringArray(value)
+  }
+
+  if (typeof value !== 'string') {
+    return []
+  }
+
+  const raw = value.trim()
+  if (!raw) {
+    return []
+  }
+
+  try {
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed)) {
+      return toStringArray(parsed)
+    }
+    return []
+  } catch {
+    if (raw.startsWith('[') || raw.startsWith('{')) {
+      return []
+    }
+  }
+
+  return raw
+    .split(/\r?\n+/)
+    .map(line => line.replace(/^\s*(?:[-*]|[（(]\d+[）)]|\d+[.)、])\s*/u, '').trim())
+    .filter(Boolean)
+}
+
 const riskToleranceToNumber = (value: RiskTolerance): number => {
   if (value === 'low') {
     return 1
@@ -258,7 +290,7 @@ const mapIdentityModel = (dto: IdentityModelDto): IdentityModelCard => {
     targetAudiencePain: dto.target_audience_pain || '',
     contentPillars: toStringArray(dto.content_pillars_json),
     toneStyleKeywords: toStringArray(dto.tone_keywords_json),
-    toneExamples: toStringArray(dto.tone_examples_json),
+    toneExamples: parseToneExamples(dto.tone_examples_json),
     longTermViews: toStringArray(dto.long_term_views_json),
     differentiation: dto.differentiation || '',
     growthPath: {

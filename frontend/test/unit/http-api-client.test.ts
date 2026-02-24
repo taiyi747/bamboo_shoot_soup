@@ -78,6 +78,34 @@ describe('createHttpApiClient', () => {
             monetization_validation_order_json: '["私域线索","咨询"]',
             risk_boundary_json: '["避免夸大收益"]',
           },
+          {
+            id: 'identity_2',
+            title: '职场表达教练',
+            target_audience_pain: '表达不成体系',
+            content_pillars_json: '["结构思维","表达模板"]',
+            tone_keywords_json: '["克制"]',
+            tone_examples_json: '1. 开头先给结论\n2. 每段只说一件事\n3. 结尾给出下一步动作',
+            long_term_views_json: '["观点1","观点2","观点3","观点4","观点5"]',
+            differentiation: '从案例入手',
+            growth_path_0_3m: '先打框架',
+            growth_path_3_12m: '沉淀方法库',
+            monetization_validation_order_json: '["咨询"]',
+            risk_boundary_json: '["不承诺结果"]',
+          },
+          {
+            id: 'identity_3',
+            title: '职场复盘拆解师',
+            target_audience_pain: '复盘无法沉淀',
+            content_pillars_json: '["项目复盘","能力映射"]',
+            tone_keywords_json: '["客观"]',
+            tone_examples_json: '[invalid-json',
+            long_term_views_json: '["观点1","观点2","观点3","观点4","观点5"]',
+            differentiation: '实践导向',
+            growth_path_0_3m: '先做周复盘',
+            growth_path_3_12m: '形成课程',
+            monetization_validation_order_json: '["私域线索"]',
+            risk_boundary_json: '["不过度营销"]',
+          },
         ]
       }
       throw new Error(`unexpected path: ${path}`)
@@ -99,6 +127,12 @@ describe('createHttpApiClient', () => {
 
     expect(result.models[0].contentPillars).toEqual(['职业问题拆解', '方法模板演示'])
     expect(result.models[0].toneExamples.length).toBeGreaterThanOrEqual(5)
+    expect(result.models[1].toneExamples).toEqual([
+      '开头先给结论',
+      '每段只说一件事',
+      '结尾给出下一步动作',
+    ])
+    expect(result.models[2].toneExamples).toEqual([])
     expect(fetchMock.mock.calls.some(call => call[0] === '/v1/identity-models/generate')).toBe(true)
     expect(fetchMock.mock.calls.some(call => call[0] === '/v1/identity-models/users/user_1')).toBe(true)
   })

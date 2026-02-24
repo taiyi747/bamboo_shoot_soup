@@ -13,6 +13,17 @@ const errorMessage = ref('')
 const selectedPrimaryId = ref<string | undefined>(state.value.selectedPrimaryId)
 const selectedBackupId = ref<string | undefined>(state.value.selectedBackupId)
 
+const toValidToneExamples = (examples: string[]): string[] =>
+  examples
+    .map(example => example.trim())
+    .filter(Boolean)
+
+const getToneExampleCount = (examples: string[]): number =>
+  toValidToneExamples(examples).length
+
+const getToneExamplePreview = (examples: string[]): string[] =>
+  toValidToneExamples(examples).slice(0, 5)
+
 const generateModels = async () => {
   if (!state.value.profile) {
     errorMessage.value = '请先完成诊断问卷。'
@@ -40,11 +51,25 @@ const validatePrimaryModel = () => {
   if (!primary.differentiation.trim()) {
     return '主身份缺少“差异化定位”。'
   }
-  if (primary.toneExamples.filter(Boolean).length < 5) {
-    return '主身份语气示例不足 5 条。'
-  }
   return ''
 }
+
+const selectedPrimaryModel = computed(() =>
+  state.value.identityModels.find(model => model.id === selectedPrimaryId.value)
+)
+
+const toneExampleWarning = computed(() => {
+  if (!selectedPrimaryModel.value) {
+    return ''
+  }
+
+  const toneExamplesCount = getToneExampleCount(selectedPrimaryModel.value.toneExamples)
+  if (toneExamplesCount >= 5) {
+    return ''
+  }
+
+  return `当前主身份仅有 ${toneExamplesCount} 条有效语气示例，建议补齐到 5 条以上。`
+})
 
 const saveSelection = async () => {
   const validationError = validatePrimaryModel()
@@ -73,7 +98,14 @@ const saveSelection = async () => {
     state.value.selectedPrimaryId = selectedPrimaryId.value
     state.value.selectedBackupId = selectedBackupId.value
 
-    await track('identity_selected', selectedPrimaryId.value)
+    const toneExamplesCount = selectedPrimaryModel.value
+      ? getToneExampleCount(selectedPrimaryModel.value.toneExamples)
+      : 0
+
+    await track('identity_selected', selectedPrimaryId.value, {
+      tone_examples_count: toneExamplesCount,
+      tone_examples_below_5: toneExamplesCount < 5,
+    })
     await navigateTo('/persona-constitution')
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '身份选择保存失败。'
@@ -135,6 +167,16 @@ const hasModels = computed(() => state.value.identityModels.length > 0)
         title="操作失败"
         :description="errorMessage"
         icon="i-lucide-alert-circle"
+        class="mb-6"
+      />
+
+      <UAlert
+        v-if="toneExampleWarning"
+        color="warning"
+        variant="soft"
+        title="语气风格示例建议"
+        :description="toneExampleWarning"
+        icon="i-lucide-alert-triangle"
         class="mb-6"
       />
 
@@ -207,10 +249,35 @@ const hasModels = computed(() => state.value.identityModels.length > 0)
                </div>
             </div>
 
+            <div>
+              <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">语气关键词</p>
+              <div class="flex flex-wrap gap-2">
+                <UBadge
+                  v-for="keyword in model.toneStyleKeywords"
+                  :key="`${model.id}-${keyword}`"
+                  color="primary"
+                  variant="soft"
+                >
+                  {{ keyword }}
+                </UBadge>
+                <span v-if="model.toneStyleKeywords.length === 0" class="text-xs text-slate-400">未提供</span>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">语气风格示例</p>
+              <ul v-if="getToneExamplePreview(model.toneExamples).length > 0" class="space-y-2 text-xs leading-relaxed">
+                <li v-for="example in getToneExamplePreview(model.toneExamples)" :key="`${model.id}-${example}`">
+                  “{{ example }}”
+                </li>
+              </ul>
+              <p v-else class="text-xs text-slate-400">暂无示例</p>
+            </div>
+
             <div class="flex items-center gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
               <UIcon name="i-lucide-message-square-quote" class="w-4 h-4 text-slate-400" />
               <p class="text-xs font-medium">
-                生成了 <span class="text-emerald-600 dark:text-emerald-400 font-bold">{{ model.toneExamples.length }}</span> 条语气风格示例
+                有效语气示例 <span class="text-emerald-600 dark:text-emerald-400 font-bold">{{ getToneExampleCount(model.toneExamples) }}</span> 条
               </p>
             </div>
           </div>
