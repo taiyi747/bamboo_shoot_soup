@@ -2,6 +2,7 @@
 import { z } from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import { useApiClient } from '../services/api/client'
+import { generationFeedbackCopy } from '../constants/generation-feedback'
 import type { OnboardingInput } from '../types/flow'
 
 const api = useApiClient()
@@ -32,6 +33,14 @@ const formState = reactive<Schema>({
 
 const loading = ref(false)
 const errorMessage = ref('')
+const feedbackMeta = { ui_feedback_variant: 'card_skeleton' }
+const feedbackCopy = generationFeedbackCopy.onboarding
+const {
+  currentHint: currentLoadingHint,
+  start: startLoadingFeedback,
+  stop: stopLoadingFeedback,
+  reset: resetLoadingFeedback,
+} = useLoadingFeedback(feedbackCopy.hints)
 
 const splitList = (value: string) =>
   value
@@ -50,15 +59,22 @@ const toInput = (data: Schema): OnboardingInput => ({
 })
 
 const onSubmit = async (event: FormSubmitEvent<Schema>) => {
+  if (loading.value) {
+    return
+  }
+
+  const startedAt = Date.now()
   loading.value = true
   errorMessage.value = ''
+  resetLoadingFeedback()
+  startLoadingFeedback()
 
   try {
     const input = toInput(event.data)
     reset()
     state.value.onboardingInput = input
 
-    await track('onboarding_started')
+    await track('onboarding_started', undefined, feedbackMeta)
     const session = await api.createOnboardingSession({
       targetPersona: 'career_creator',
       goals: input.goals,
@@ -71,12 +87,17 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
     state.value.sessionId = session.sessionId
     state.value.profile = profile.profile
 
-    await track('onboarding_completed')
+    await track('onboarding_completed', undefined, {
+      ...feedbackMeta,
+      loading_duration_ms: Date.now() - startedAt,
+    })
     await navigateTo('/identity-models')
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '诊断生成失败，请重试。'
   } finally {
     loading.value = false
+    stopLoadingFeedback()
+    resetLoadingFeedback()
   }
 }
 </script>
@@ -108,6 +129,15 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
         :description="errorMessage"
         icon="i-lucide-alert-triangle"
         class="mb-6"
+      />
+
+      <GenerationFeedbackCard
+        v-if="loading"
+        :title="feedbackCopy.title"
+        :description="feedbackCopy.description"
+        :hint="currentLoadingHint"
+        :icon="feedbackCopy.icon"
+        :color="feedbackCopy.color"
       />
 
       <UForm :schema="schema" :state="formState" class="space-y-6" @submit="onSubmit">
@@ -170,6 +200,7 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
           <UButton 
             type="submit" 
             :loading="loading" 
+            :disabled="loading"
             class="touch-target flex-1 sm:flex-none justify-center px-8 shadow-md hover:shadow-lg transition-all font-semibold"
             size="lg"
             color="primary"

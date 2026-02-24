@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useApiClient } from '../services/api/client'
+import { generationFeedbackCopy } from '../constants/generation-feedback'
 import type { PersonaConstitution } from '../types/flow'
 
 const api = useApiClient()
@@ -7,6 +8,13 @@ const { state, selectedPrimaryModel } = useMvpFlow()
 
 const loading = ref(false)
 const errorMessage = ref('')
+const feedbackCopy = generationFeedbackCopy.personaConstitution
+const {
+  currentHint: currentLoadingHint,
+  start: startLoadingFeedback,
+  stop: stopLoadingFeedback,
+  reset: resetLoadingFeedback,
+} = useLoadingFeedback(feedbackCopy.hints)
 
 const form = reactive({
   commonWords: '',
@@ -50,6 +58,10 @@ const saveDraft = () => {
 }
 
 const generateConstitution = async () => {
+  if (loading.value) {
+    return
+  }
+
   if (!selectedPrimaryModel.value) {
     errorMessage.value = '请先在上一页选择主身份。'
     return
@@ -57,6 +69,8 @@ const generateConstitution = async () => {
 
   loading.value = true
   errorMessage.value = ''
+  resetLoadingFeedback()
+  startLoadingFeedback()
   try {
     const result = await api.generatePersonaConstitution({
       identityModel: selectedPrimaryModel.value,
@@ -67,10 +81,15 @@ const generateConstitution = async () => {
     errorMessage.value = error instanceof Error ? error.message : '人格宪法生成失败。'
   } finally {
     loading.value = false
+    stopLoadingFeedback()
+    resetLoadingFeedback()
   }
 }
 
 const nextStep = async () => {
+  if (loading.value) {
+    return
+  }
   saveDraft()
   await navigateTo('/launch-kit')
 }
@@ -112,6 +131,7 @@ if (state.value.persona) {
               color="primary" 
               class="touch-target font-semibold shadow-md" 
               trailing-icon="i-lucide-arrow-right"
+              :disabled="loading"
               @click="nextStep"
             >
               保存并进入启动包
@@ -128,6 +148,15 @@ if (state.value.persona) {
         :description="errorMessage"
         icon="i-lucide-alert-circle"
         class="mb-6"
+      />
+
+      <GenerationFeedbackCard
+        v-if="loading"
+        :title="feedbackCopy.title"
+        :description="feedbackCopy.description"
+        :hint="currentLoadingHint"
+        :icon="feedbackCopy.icon"
+        :color="feedbackCopy.color"
       />
 
       <div v-if="!state.persona && !loading" class="flex flex-col items-center justify-center py-12 px-4 text-center border border-dashed border-slate-300 dark:border-slate-800 rounded-3xl">
@@ -150,7 +179,7 @@ if (state.value.persona) {
           </UButton>
       </div>
 
-      <div v-else class="space-y-6 lg:space-y-8">
+      <div v-else-if="state.persona" class="space-y-6 lg:space-y-8">
         <div class="grid gap-6 md:grid-cols-2 lg:gap-8">
           <UFormField label="口吻词典：常用词" name="commonWords" class="w-full">
             <template #description><span class="text-xs text-emerald-600 dark:text-emerald-400">强化你的身份特质的积极词汇（每行一个）</span></template>
@@ -207,6 +236,7 @@ if (state.value.persona) {
               class="touch-target justify-center font-semibold shadow-md" 
               size="lg"
               trailing-icon="i-lucide-arrow-right"
+              :disabled="loading"
               @click="nextStep"
             >
               保存并进入启动包

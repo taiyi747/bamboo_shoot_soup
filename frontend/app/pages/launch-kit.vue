@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useApiClient } from '../services/api/client'
+import { generationFeedbackCopy } from '../constants/generation-feedback'
 
 const api = useApiClient()
 const { track } = useAnalytics()
@@ -7,26 +8,46 @@ const { state, selectedPrimaryModel } = useMvpFlow()
 
 const loading = ref(false)
 const errorMessage = ref('')
+const feedbackMeta = { ui_feedback_variant: 'card_skeleton' }
+const feedbackCopy = generationFeedbackCopy.launchKit
+const {
+  currentHint: currentLoadingHint,
+  start: startLoadingFeedback,
+  stop: stopLoadingFeedback,
+  reset: resetLoadingFeedback,
+} = useLoadingFeedback(feedbackCopy.hints)
 
 const generateLaunchKit = async () => {
+  if (loading.value) {
+    return
+  }
+
   if (!selectedPrimaryModel.value || !state.value.persona) {
     errorMessage.value = '请先完成主身份和人格宪法。'
     return
   }
 
+  const startedAt = Date.now()
   loading.value = true
   errorMessage.value = ''
+  resetLoadingFeedback()
+  startLoadingFeedback()
   try {
     const result = await api.generateLaunchKit({
       identityModel: selectedPrimaryModel.value,
       constitution: state.value.persona,
     })
     state.value.launchKit = result.launchKit
-    await track('launch_kit_generated', selectedPrimaryModel.value.id)
+    await track('launch_kit_generated', selectedPrimaryModel.value.id, {
+      ...feedbackMeta,
+      loading_duration_ms: Date.now() - startedAt,
+    })
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '启动包生成失败。'
   } finally {
     loading.value = false
+    stopLoadingFeedback()
+    resetLoadingFeedback()
   }
 }
 </script>
@@ -59,11 +80,12 @@ const generateLaunchKit = async () => {
             >
               重新生成
             </UButton>
-            <NuxtLink to="/consistency-check"">
+            <NuxtLink to="/consistency-check">
               <UButton 
                 color="primary" 
                 class="touch-target font-semibold shadow-md" 
                 trailing-icon="i-lucide-arrow-right"
+                :disabled="loading"
               >
                 进行一致性检查
               </UButton>
@@ -80,6 +102,15 @@ const generateLaunchKit = async () => {
         :description="errorMessage"
          icon="i-lucide-alert-circle"
         class="mb-6"
+      />
+
+      <GenerationFeedbackCard
+        v-if="loading"
+        :title="feedbackCopy.title"
+        :description="feedbackCopy.description"
+        :hint="currentLoadingHint"
+        :icon="feedbackCopy.icon"
+        :color="feedbackCopy.color"
       />
 
        <div v-if="!state.launchKit && !loading" class="flex flex-col items-center justify-center py-16 px-4 text-center border border-dashed border-slate-300 dark:border-slate-800 rounded-3xl">
@@ -211,12 +242,13 @@ const generateLaunchKit = async () => {
             >
               重新生成
             </UButton>
-            <NuxtLink to="/consistency-check"" class="w-full block">
+            <NuxtLink to="/consistency-check" class="w-full block">
               <UButton 
                 color="primary" 
                 class="touch-target justify-center font-semibold shadow-md w-full" 
                 size="lg"
                 trailing-icon="i-lucide-arrow-right"
+                :disabled="loading"
               >
                 继续
               </UButton>

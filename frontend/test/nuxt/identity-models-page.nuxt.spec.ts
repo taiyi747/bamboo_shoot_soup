@@ -63,6 +63,16 @@ const createFlowState = (): MvpFlowState => ({
 
 const state = ref<MvpFlowState>(createFlowState())
 
+const createDeferred = <T>() => {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, resolve, reject }
+}
+
 vi.mock('../../app/services/api/client', () => ({
   useApiClient: () => ({
     generateIdentityModels: generateIdentityModelsMock,
@@ -100,6 +110,50 @@ describe('identity models page', () => {
     expect(wrapper.text()).toContain('语气关键词')
     expect(wrapper.text()).toContain('克制')
     expect(wrapper.text()).toContain('先给结论，再展开步骤。')
+  })
+
+  it('shows loading feedback during generation and blocks duplicate trigger', async () => {
+    state.value = {
+      ...createFlowState(),
+      profile: {
+        skillStack: ['技能'],
+        energyCurve: ['兴趣'],
+        cognitiveStyle: '结构化',
+        valueBoundaries: ['边界'],
+        riskTolerance: 'medium',
+        weeklyHours: 6,
+        recommendedPlatforms: ['公众号'],
+      },
+      identityModels: [],
+    }
+    const deferred = createDeferred<{ models: MvpFlowState['identityModels'] }>()
+    generateIdentityModelsMock.mockReturnValueOnce(deferred.promise)
+
+    const IdentityModelsPage = (await import('../../app/pages/identity-models.vue')).default
+    const wrapper = await mountSuspended(IdentityModelsPage)
+    const generateButton = wrapper.findAll('button').find(button => button.text().includes('立即生成身份模型'))
+
+    expect(generateButton).toBeTruthy()
+    await generateButton!.trigger('click')
+    await generateButton!.trigger('click')
+    await flushPromises()
+
+    expect(generateIdentityModelsMock).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('[data-testid="generation-feedback-card"]').exists()).toBe(true)
+    expect(wrapper.text()).toContain('正在生成身份模型')
+
+    deferred.resolve({ models: createFlowState().identityModels })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="generation-feedback-card"]').exists()).toBe(false)
+    expect(trackMock).toHaveBeenCalledWith(
+      'identity_models_generated',
+      undefined,
+      expect.objectContaining({
+        ui_feedback_variant: 'card_skeleton',
+        loading_duration_ms: expect.any(Number),
+      })
+    )
   })
 
   it('shows warning for primary tone examples below 5 and still allows save', async () => {

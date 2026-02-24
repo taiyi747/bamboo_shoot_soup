@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useApiClient } from '../services/api/client'
+import { generationFeedbackCopy } from '../constants/generation-feedback'
 import { computed, ref } from 'vue'
 
 const api = useApiClient()
@@ -9,6 +10,14 @@ const { state } = useMvpFlow()
 const loading = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
+const feedbackMeta = { ui_feedback_variant: 'card_skeleton' }
+const feedbackCopy = generationFeedbackCopy.identityModels
+const {
+  currentHint: currentLoadingHint,
+  start: startLoadingFeedback,
+  stop: stopLoadingFeedback,
+  reset: resetLoadingFeedback,
+} = useLoadingFeedback(feedbackCopy.hints)
 
 const selectedPrimaryId = ref<string | undefined>(state.value.selectedPrimaryId)
 const selectedBackupId = ref<string | undefined>(state.value.selectedBackupId)
@@ -25,21 +34,33 @@ const getToneExamplePreview = (examples: string[]): string[] =>
   toValidToneExamples(examples).slice(0, 5)
 
 const generateModels = async () => {
+  if (loading.value) {
+    return
+  }
+
   if (!state.value.profile) {
     errorMessage.value = '请先完成诊断问卷。'
     return
   }
 
+  const startedAt = Date.now()
   loading.value = true
   errorMessage.value = ''
+  resetLoadingFeedback()
+  startLoadingFeedback()
   try {
     const result = await api.generateIdentityModels({ profile: state.value.profile })
     state.value.identityModels = result.models
-    await track('identity_models_generated')
+    await track('identity_models_generated', undefined, {
+      ...feedbackMeta,
+      loading_duration_ms: Date.now() - startedAt,
+    })
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '身份模型生成失败。'
   } finally {
     loading.value = false
+    stopLoadingFeedback()
+    resetLoadingFeedback()
   }
 }
 
@@ -72,6 +93,10 @@ const toneExampleWarning = computed(() => {
 })
 
 const saveSelection = async () => {
+  if (loading.value || saving.value) {
+    return
+  }
+
   const validationError = validatePrimaryModel()
   if (validationError) {
     errorMessage.value = validationError
@@ -152,6 +177,7 @@ const hasModels = computed(() => state.value.identityModels.length > 0)
                 size="lg"
                 trailing-icon="i-lucide-arrow-right"
                 :loading="saving"
+                :disabled="loading || saving"
                 @click="saveSelection"
               >
                 保存选择并继续
@@ -178,6 +204,15 @@ const hasModels = computed(() => state.value.identityModels.length > 0)
         :description="toneExampleWarning"
         icon="i-lucide-alert-triangle"
         class="mb-6"
+      />
+
+      <GenerationFeedbackCard
+        v-if="loading"
+        :title="feedbackCopy.title"
+        :description="feedbackCopy.description"
+        :hint="currentLoadingHint"
+        :icon="feedbackCopy.icon"
+        :color="feedbackCopy.color"
       />
 
       <div v-if="!hasModels" class="flex flex-col items-center justify-center py-16 px-4 text-center border border-dashed border-slate-300 dark:border-slate-800 rounded-3xl">
@@ -288,6 +323,7 @@ const hasModels = computed(() => state.value.identityModels.length > 0)
                 class="touch-target justify-center font-medium transition-colors"
                 :color="selectedPrimaryId === model.id ? 'primary' : 'neutral'"
                 :variant="selectedPrimaryId === model.id ? 'solid' : 'outline'"
+                :disabled="loading || saving"
                 @click="selectedPrimaryId = model.id; if(selectedBackupId === model.id) selectedBackupId = undefined"
               >
                 设为主身份
@@ -296,6 +332,7 @@ const hasModels = computed(() => state.value.identityModels.length > 0)
                 class="touch-target justify-center font-medium transition-colors"
                 :color="selectedBackupId === model.id ? 'success' : 'neutral'"
                 :variant="selectedBackupId === model.id ? 'soft' : 'outline'"
+                :disabled="loading || saving"
                 @click="selectedBackupId = model.id; if(selectedPrimaryId === model.id) selectedPrimaryId = undefined"
               >
                 设为备身份
@@ -323,6 +360,7 @@ const hasModels = computed(() => state.value.identityModels.length > 0)
             size="lg"
             trailing-icon="i-lucide-arrow-right"
             :loading="saving"
+            :disabled="loading || saving"
             @click="saveSelection"
           >
             保存选择并继续

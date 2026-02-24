@@ -2,6 +2,7 @@
 import { z } from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
 import { useApiClient } from '../services/api/client'
+import { generationFeedbackCopy } from '../constants/generation-feedback'
 
 const api = useApiClient()
 const { track } = useAnalytics()
@@ -21,15 +22,30 @@ const formState = reactive<Schema>({
 
 const loading = ref(false)
 const errorMessage = ref('')
+const feedbackMeta = { ui_feedback_variant: 'card_skeleton' }
+const feedbackCopy = generationFeedbackCopy.consistencyCheck
+const {
+  currentHint: currentLoadingHint,
+  start: startLoadingFeedback,
+  stop: stopLoadingFeedback,
+  reset: resetLoadingFeedback,
+} = useLoadingFeedback(feedbackCopy.hints)
 
 const onSubmit = async (event: FormSubmitEvent<Schema>) => {
+  if (loading.value) {
+    return
+  }
+
   if (!selectedPrimaryModel.value || !state.value.persona) {
     errorMessage.value = '请先完成主身份、人格宪法与启动包。'
     return
   }
 
+  const startedAt = Date.now()
   loading.value = true
   errorMessage.value = ''
+  resetLoadingFeedback()
+  startLoadingFeedback()
   try {
     state.value.draftToCheck = event.data.draft
     const result = await api.runConsistencyCheck({
@@ -39,11 +55,16 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
     })
 
     state.value.consistencyCheck = result.result
-    await track('consistency_check_triggered', selectedPrimaryModel.value.id)
+    await track('consistency_check_triggered', selectedPrimaryModel.value.id, {
+      ...feedbackMeta,
+      loading_duration_ms: Date.now() - startedAt,
+    })
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '一致性检查失败。'
   } finally {
     loading.value = false
+    stopLoadingFeedback()
+    resetLoadingFeedback()
   }
 }
 </script>
@@ -77,8 +98,17 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
         class="mb-6"
       />
 
+      <GenerationFeedbackCard
+        v-if="loading"
+        :title="feedbackCopy.title"
+        :description="feedbackCopy.description"
+        :hint="currentLoadingHint"
+        :icon="feedbackCopy.icon"
+        :color="feedbackCopy.color"
+      />
+
       <UForm :schema="schema" :state="formState" class="space-y-6" @submit="onSubmit">
-        <UFormField label="输入待发布草稿文本区"" name="draft" class="w-full">
+        <UFormField label="输入待发布草稿文本区" name="draft" class="w-full">
            <template #description><span class="text-xs text-slate-500">可粘贴你准备发送的文章正文、脚本段落或是观点长文。</span></template>
           <UTextarea 
             v-model="formState.draft" 
@@ -99,14 +129,14 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
           >
             执行人格一致性检查
           </UButton>
-          <NuxtLink to="/review"" class="flex-1 sm:flex-none">
+          <NuxtLink to="/review" class="flex-1 sm:flex-none">
             <UButton 
               color="neutral" 
               variant="outline" 
               class="touch-target justify-center w-full font-medium h-full" 
               size="lg"
               trailing-icon="i-lucide-arrow-right"
-              :disabled="!state.consistencyCheck"
+              :disabled="loading || !state.consistencyCheck"
             >
               继续前往交付汇总
             </UButton>
