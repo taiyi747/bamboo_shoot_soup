@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import threading
 
 import pytest
 from sqlalchemy import create_engine
@@ -24,22 +25,24 @@ class _FakeLLMClient:
     def __init__(self, payload_by_operation: dict[str, dict | list[dict]]) -> None:
         self._payload_by_operation = copy.deepcopy(payload_by_operation)
         self.calls: list[dict] = []
+        self._lock = threading.Lock()
 
     def generate_json(self, *, operation: str, system_prompt: str, user_payload: dict) -> dict:
-        self.calls.append(
-            {
-                "operation": operation,
-                "system_prompt": system_prompt,
-                "user_payload": copy.deepcopy(user_payload),
-            }
-        )
-        operation_payload = self._payload_by_operation[operation]
-        if isinstance(operation_payload, list):
-            if not operation_payload:
-                raise AssertionError(f"no payload left for operation={operation}")
-            current = operation_payload.pop(0)
-            return copy.deepcopy(current)
-        return copy.deepcopy(operation_payload)
+        with self._lock:
+            self.calls.append(
+                {
+                    "operation": operation,
+                    "system_prompt": system_prompt,
+                    "user_payload": copy.deepcopy(user_payload),
+                }
+            )
+            operation_payload = self._payload_by_operation[operation]
+            if isinstance(operation_payload, list):
+                if not operation_payload:
+                    raise AssertionError(f"no payload left for operation={operation}")
+                current = operation_payload.pop(0)
+                return copy.deepcopy(current)
+            return copy.deepcopy(operation_payload)
 
 
 def _make_db_session(tmp_path) -> tuple[Session, str]:
@@ -93,98 +96,34 @@ def _invalid_launch_kit_payload_missing_outline() -> dict:
     return payload
 
 
-def _identity_models_payload(prefix: str) -> dict:
+def _identity_model_payload(prefix: str, label: str) -> dict:
     return {
         "models": [
             {
-                "title": f"{prefix} A",
-                "target_audience_pain": "Pain A",
+                "title": f"{prefix} {label}",
+                "target_audience_pain": f"Pain {label}",
                 "content_pillars": ["P1", "P2", "P3"],
                 "tone_keywords": ["k1", "k2"],
                 "tone_examples": ["e1", "e2", "e3", "e4", "e5"],
                 "long_term_views": ["v1", "v2", "v3", "v4", "v5"],
-                "differentiation": f"{prefix} Diff A",
-                "growth_path_0_3m": "Plan A1",
-                "growth_path_3_12m": "Plan A2",
-                "monetization_validation_order": ["m1"],
-                "risk_boundary": ["r1"],
-            },
-            {
-                "title": f"{prefix} B",
-                "target_audience_pain": "Pain B",
-                "content_pillars": ["P1", "P2", "P3"],
-                "tone_keywords": ["k1", "k2"],
-                "tone_examples": ["e1", "e2", "e3", "e4", "e5"],
-                "long_term_views": ["v1", "v2", "v3", "v4", "v5"],
-                "differentiation": f"{prefix} Diff B",
-                "growth_path_0_3m": "Plan B1",
-                "growth_path_3_12m": "Plan B2",
-                "monetization_validation_order": ["m1"],
-                "risk_boundary": ["r1"],
-            },
-            {
-                "title": f"{prefix} C",
-                "target_audience_pain": "Pain C",
-                "content_pillars": ["P1", "P2", "P3"],
-                "tone_keywords": ["k1", "k2"],
-                "tone_examples": ["e1", "e2", "e3", "e4", "e5"],
-                "long_term_views": ["v1", "v2", "v3", "v4", "v5"],
-                "differentiation": f"{prefix} Diff C",
-                "growth_path_0_3m": "Plan C1",
-                "growth_path_3_12m": "Plan C2",
+                "differentiation": f"{prefix} Diff {label}",
+                "growth_path_0_3m": f"Plan {label}1",
+                "growth_path_3_12m": f"Plan {label}2",
                 "monetization_validation_order": ["m1"],
                 "risk_boundary": ["r1"],
             },
         ]
     }
+
+
+def _identity_model_payloads(prefix: str, count: int) -> list[dict]:
+    labels = ["A", "B", "C", "D", "E"][:count]
+    return [_identity_model_payload(prefix, label) for label in labels]
 
 
 def test_generate_identity_models_persists_count(monkeypatch, tmp_path) -> None:
     db, user_id = _make_db_session(tmp_path)
-    payload = {
-        "models": [
-            {
-                "title": "Identity A",
-                "target_audience_pain": "Pain A",
-                "content_pillars": ["P1", "P2", "P3"],
-                "tone_keywords": ["k1", "k2"],
-                "tone_examples": ["e1", "e2", "e3", "e4", "e5"],
-                "long_term_views": ["v1", "v2", "v3", "v4", "v5"],
-                "differentiation": "Diff A",
-                "growth_path_0_3m": "Plan A1",
-                "growth_path_3_12m": "Plan A2",
-                "monetization_validation_order": ["m1"],
-                "risk_boundary": ["r1"],
-            },
-            {
-                "title": "Identity B",
-                "target_audience_pain": "Pain B",
-                "content_pillars": ["P1", "P2", "P3"],
-                "tone_keywords": ["k1", "k2"],
-                "tone_examples": ["e1", "e2", "e3", "e4", "e5"],
-                "long_term_views": ["v1", "v2", "v3", "v4", "v5"],
-                "differentiation": "Diff B",
-                "growth_path_0_3m": "Plan B1",
-                "growth_path_3_12m": "Plan B2",
-                "monetization_validation_order": ["m1"],
-                "risk_boundary": ["r1"],
-            },
-            {
-                "title": "Identity C",
-                "target_audience_pain": "Pain C",
-                "content_pillars": ["P1", "P2", "P3"],
-                "tone_keywords": ["k1", "k2"],
-                "tone_examples": ["e1", "e2", "e3", "e4", "e5"],
-                "long_term_views": ["v1", "v2", "v3", "v4", "v5"],
-                "differentiation": "Diff C",
-                "growth_path_0_3m": "Plan C1",
-                "growth_path_3_12m": "Plan C2",
-                "monetization_validation_order": ["m1"],
-                "risk_boundary": ["r1"],
-            },
-        ]
-    }
-    fake_client = _FakeLLMClient({"generate_identity_models": payload})
+    fake_client = _FakeLLMClient({"generate_identity_models": _identity_model_payloads("Identity", 3)})
     monkeypatch.setattr(identity_service, "get_llm_client", lambda: fake_client)
 
     models = identity_service.generate_identity_models(
@@ -197,9 +136,32 @@ def test_generate_identity_models_persists_count(monkeypatch, tmp_path) -> None:
 
     assert len(models) == 3
     assert all(model.differentiation for model in models)
+    identity_calls = [c for c in fake_client.calls if c["operation"] == "generate_identity_models"]
+    assert len(identity_calls) == 3
+    assert all(call["user_payload"]["count"] == 1 for call in identity_calls)
     prompt = fake_client.calls[0]["system_prompt"]
     assert "risk_boundary must be a JSON array of non-empty strings, never a plain string." in prompt
     assert "every models[i].risk_boundary is an array type" in prompt
+    _close_db(db)
+
+
+def test_generate_identity_models_supports_count_five(monkeypatch, tmp_path) -> None:
+    db, user_id = _make_db_session(tmp_path)
+    fake_client = _FakeLLMClient({"generate_identity_models": _identity_model_payloads("Count5", 5)})
+    monkeypatch.setattr(identity_service, "get_llm_client", lambda: fake_client)
+
+    models = identity_service.generate_identity_models(
+        db=db,
+        user_id=user_id,
+        session_id=None,
+        capability_profile={"skill_stack": ["python"]},
+        count=5,
+    )
+
+    assert len(models) == 5
+    identity_calls = [c for c in fake_client.calls if c["operation"] == "generate_identity_models"]
+    assert len(identity_calls) == 5
+    assert all(call["user_payload"]["count"] == 1 for call in identity_calls)
     _close_db(db)
 
 
@@ -208,8 +170,8 @@ def test_generate_identity_models_replaces_previous_batch(monkeypatch, tmp_path)
     fake_client = _FakeLLMClient(
         {
             "generate_identity_models": [
-                _identity_models_payload("Batch1"),
-                _identity_models_payload("Batch2"),
+                *_identity_model_payloads("Batch1", 3),
+                *_identity_model_payloads("Batch2", 3),
             ]
         }
     )
@@ -250,8 +212,8 @@ def test_generate_identity_models_clears_previous_selection_and_unlinks_dependen
     fake_client = _FakeLLMClient(
         {
             "generate_identity_models": [
-                _identity_models_payload("Batch1"),
-                _identity_models_payload("Batch2"),
+                *_identity_model_payloads("Batch1", 3),
+                *_identity_model_payloads("Batch2", 3),
             ]
         }
     )
@@ -501,46 +463,8 @@ def test_generate_launch_kit_fails_after_schema_retry_exhaustion(monkeypatch, tm
 
 def test_identity_generation_schema_error_when_field_missing(monkeypatch, tmp_path) -> None:
     db, user_id = _make_db_session(tmp_path)
-    payload = {
-        "models": [
-            {
-                "title": "Identity A",
-                "target_audience_pain": "Pain A",
-                "content_pillars": ["P1", "P2", "P3"],
-                "tone_keywords": ["k1", "k2"],
-                "tone_examples": ["e1", "e2", "e3", "e4", "e5"],
-                "long_term_views": ["v1", "v2", "v3", "v4", "v5"],
-                "growth_path_0_3m": "Plan A1",
-                "growth_path_3_12m": "Plan A2",
-                "monetization_validation_order": ["m1"],
-                "risk_boundary": ["r1"],
-            },
-            {
-                "title": "Identity B",
-                "target_audience_pain": "Pain B",
-                "content_pillars": ["P1", "P2", "P3"],
-                "tone_keywords": ["k1", "k2"],
-                "tone_examples": ["e1", "e2", "e3", "e4", "e5"],
-                "long_term_views": ["v1", "v2", "v3", "v4", "v5"],
-                "growth_path_0_3m": "Plan B1",
-                "growth_path_3_12m": "Plan B2",
-                "monetization_validation_order": ["m1"],
-                "risk_boundary": ["r1"],
-            },
-            {
-                "title": "Identity C",
-                "target_audience_pain": "Pain C",
-                "content_pillars": ["P1", "P2", "P3"],
-                "tone_keywords": ["k1", "k2"],
-                "tone_examples": ["e1", "e2", "e3", "e4", "e5"],
-                "long_term_views": ["v1", "v2", "v3", "v4", "v5"],
-                "growth_path_0_3m": "Plan C1",
-                "growth_path_3_12m": "Plan C2",
-                "monetization_validation_order": ["m1"],
-                "risk_boundary": ["r1"],
-            },
-        ]
-    }
+    payload = _identity_model_payload("Identity", "A")
+    payload["models"][0].pop("differentiation")
     fake_client = _FakeLLMClient({"generate_identity_models": payload})
     monkeypatch.setattr(identity_service, "get_llm_client", lambda: fake_client)
 
@@ -554,4 +478,36 @@ def test_identity_generation_schema_error_when_field_missing(monkeypatch, tmp_pa
         )
 
     assert exc_info.value.code == "LLM_SCHEMA_VALIDATION_FAILED"
+    _close_db(db)
+
+
+def test_generate_identity_models_fails_without_partial_persist_when_one_candidate_invalid(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    db, user_id = _make_db_session(tmp_path)
+    invalid_payload = _identity_model_payload("Batch", "B")
+    invalid_payload["models"][0].pop("differentiation")
+    fake_client = _FakeLLMClient(
+        {
+            "generate_identity_models": [
+                _identity_model_payload("Batch", "A"),
+                invalid_payload,
+                _identity_model_payload("Batch", "C"),
+            ]
+        }
+    )
+    monkeypatch.setattr(identity_service, "get_llm_client", lambda: fake_client)
+
+    with pytest.raises(LLMServiceError):
+        identity_service.generate_identity_models(
+            db=db,
+            user_id=user_id,
+            session_id=None,
+            capability_profile={},
+            count=3,
+        )
+
+    persisted = db.query(IdentityModel).filter(IdentityModel.user_id == user_id).count()
+    assert persisted == 0
     _close_db(db)
