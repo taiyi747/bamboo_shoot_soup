@@ -143,7 +143,7 @@ def test_full_flow():
 
     print()
     print("=" * 50)
-    print("PASS: Full flow test completed successfully!")
+    print("通过:全流程测试已成功完成!")
     print("=" * 50)
 
 
