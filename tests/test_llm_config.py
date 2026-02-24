@@ -44,3 +44,23 @@ def test_default_openai_timeout_is_extended() -> None:
     )
 
     assert settings.openai_timeout_seconds == 90.0
+
+
+def test_cors_allow_origins_accepts_json_and_csv_formats() -> None:
+    json_settings = Settings(
+        _env_file=None,
+        cors_allow_origins='["http://127.0.0.1:3000","http://localhost:3000"]',
+    )
+    csv_settings = Settings(
+        _env_file=None,
+        cors_allow_origins="http://127.0.0.1:3000,http://localhost:3000",
+    )
+
+    assert json_settings.cors_allow_origins == [
+        "http://127.0.0.1:3000",
+        "http://localhost:3000",
+    ]
+    assert csv_settings.cors_allow_origins == [
+        "http://127.0.0.1:3000",
+        "http://localhost:3000",
+    ]
