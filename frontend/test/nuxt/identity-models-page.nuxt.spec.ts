@@ -156,6 +156,31 @@ describe('identity models page', () => {
     )
   })
 
+  it('renders primary and backup badges in card header without clipped offset classes', async () => {
+    const IdentityModelsPage = (await import('../../app/pages/identity-models.vue')).default
+    const wrapper = await mountSuspended(IdentityModelsPage)
+
+    const primaryButtons = wrapper.findAll('button').filter(button => button.text().includes('设为主身份'))
+    await primaryButtons[0]!.trigger('click')
+    await flushPromises()
+
+    const primaryBadge = wrapper.find('[data-testid="identity-card-primary-badge"]')
+    expect(primaryBadge.exists()).toBe(true)
+    expect(primaryBadge.text()).toContain('主身份')
+
+    const backupButtons = wrapper.findAll('button').filter(button => button.text().includes('设为备身份'))
+    await backupButtons[1]!.trigger('click')
+    await flushPromises()
+
+    const backupBadge = wrapper.find('[data-testid="identity-card-backup-badge"]')
+    expect(backupBadge.exists()).toBe(true)
+    expect(backupBadge.text()).toContain('备身份')
+
+    const html = wrapper.html()
+    expect(html).not.toContain('-top-3')
+    expect(html).not.toContain('-right-3')
+  })
+
   it('shows warning for primary tone examples below 5 and still allows save', async () => {
     const IdentityModelsPage = (await import('../../app/pages/identity-models.vue')).default
     const wrapper = await mountSuspended(IdentityModelsPage)
