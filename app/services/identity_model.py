@@ -9,7 +9,7 @@ from pydantic import BaseModel, ValidationError, model_validator
 from sqlalchemy.orm import Session
 
 from app.models.content_matrix import ContentMatrix, ContentTopic
-from app.models.consistency_check import ConsistencyCheck
+from app.models.consistency_check import ConsistencyCheck, EventLog
 from app.models.growth_experiment import GrowthExperiment
 from app.models.identity_model import IdentityModel, IdentitySelection
 from app.models.identity_portfolio import IdentityPortfolio
@@ -185,6 +185,11 @@ def _replace_user_identity_models(db: Session, user_id: str) -> None:
 
     db.query(ViewpointAsset).filter(ViewpointAsset.identity_model_id.in_(existing_model_ids)).update(
         {ViewpointAsset.identity_model_id: None},
+        synchronize_session=False,
+    )
+
+    db.query(EventLog).filter(EventLog.identity_model_id.in_(existing_model_ids)).update(
+        {EventLog.identity_model_id: None},
         synchronize_session=False,
     )
 

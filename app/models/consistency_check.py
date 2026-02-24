@@ -70,7 +70,11 @@ class EventLog(Base):
 
     event_name: Mapped[str] = mapped_column(String(100), nullable=False)
     stage: Mapped[str] = mapped_column(String(10), nullable=False)  # MVP/V1/V2
-    identity_model_id: Mapped[str | None] = mapped_column(String(length=36), nullable=True)
+    identity_model_id: Mapped[str | None] = mapped_column(
+        String(length=36),
+        ForeignKey("identity_models.id"),
+        nullable=True,
+    )
     payload_json: Mapped[str] = mapped_column(Text, default="{}")
 
     occurred_at: Mapped[datetime] = mapped_column(

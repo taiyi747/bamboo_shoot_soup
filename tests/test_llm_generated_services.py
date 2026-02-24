@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.db.base import Base
 from app.models.content_matrix import ContentMatrix, ContentTopic
-from app.models.consistency_check import ConsistencyCheck
+from app.models.consistency_check import ConsistencyCheck, EventLog
 from app.models.growth_experiment import GrowthExperiment
 from app.models.identity_model import IdentityModel, IdentitySelection
 from app.models.identity_portfolio import IdentityPortfolio
@@ -332,6 +332,13 @@ def test_generate_identity_models_clears_previous_selection_and_unlinks_dependen
         topic="topic",
         platform="xhs",
     )
+    event = EventLog(
+        user_id=user_id,
+        event_name="identity_models_generated",
+        stage="MVP",
+        identity_model_id=first_batch[0].id,
+        payload_json="{}",
+    )
     db.add_all(
         [
             constitution,
@@ -345,6 +352,7 @@ def test_generate_identity_models_clears_previous_selection_and_unlinks_dependen
             portfolio,
             evaluation,
             asset,
+            event,
         ]
     )
     db.commit()
@@ -360,6 +368,7 @@ def test_generate_identity_models_clears_previous_selection_and_unlinks_dependen
     evaluation_id = evaluation.id
     asset_id = asset.id
     portfolio_id = portfolio.id
+    event_id = event.id
     old_ids = {model.id for model in first_batch}
 
     second_batch = identity_service.generate_identity_models(
@@ -392,6 +401,7 @@ def test_generate_identity_models_clears_previous_selection_and_unlinks_dependen
     )
     refreshed_asset = db.query(ViewpointAsset).filter(ViewpointAsset.id == asset_id).first()
     refreshed_portfolio = db.query(IdentityPortfolio).filter(IdentityPortfolio.id == portfolio_id).first()
+    refreshed_event = db.query(EventLog).filter(EventLog.id == event_id).first()
     current_models = identity_service.get_user_identity_models(db, user_id)
 
     assert len(second_batch) == 3
@@ -417,6 +427,8 @@ def test_generate_identity_models_clears_previous_selection_and_unlinks_dependen
     assert refreshed_monetization_map.identity_model_id is None
     assert refreshed_evaluation.identity_model_id is None
     assert refreshed_asset.identity_model_id is None
+    assert refreshed_event is not None
+    assert refreshed_event.identity_model_id is None
     assert refreshed_portfolio is None
     assert {model.id for model in current_models} == second_ids
     _close_db(db)
