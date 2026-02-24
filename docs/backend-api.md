@@ -34,8 +34,9 @@
 | `OPENAI_API_KEY` | 是 | LLM 调用凭证 |
 | `OPENAI_BASE_URL` | 是 | OpenAI 兼容地址，启动时会做 URL 归一化与合法性校验 |
 | `MODEL_NAME` | 是 | LLM 模型名 |
+| `REASONING` | 否 | 控制是否在 LLM 请求里透传 `reasoning=true/false`；当 `REASONING=false` 时还会透传 `enable_thinking=false`（兼容网关），未设置则不透传 |
 
-缺失时应用直接启动失败，不接受业务请求。
+`OPENAI_API_KEY` / `OPENAI_BASE_URL` / `MODEL_NAME` 任一缺失时，应用直接启动失败，不接受业务请求。
 
 ## 3. V1 范围对齐状态
 
@@ -217,6 +218,11 @@
 | `constitution_id` | string \| null | 否 | - |
 | `sustainable_columns` | string[] | 否 | 服务层强校验输出 `>=3` |
 | `growth_experiment_suggestion` | object[] | 否 | 服务层强校验输出 `>=1` |
+
+补充说明（服务层自动解析）：
+- 当 `identity_model_id` 未提供或无效时，服务会按顺序尝试：主身份选择 -> 用户最新身份。
+- 当 `constitution_id` 未提供或无效时，服务会按顺序尝试：与已解析身份关联的最新宪法 -> 用户最新宪法。
+- 即使解析不到上下文，也会继续生成（不会因上下文缺失返回 422）。
 
 ### 6.5 Consistency
 
@@ -434,6 +440,10 @@
   - `day_no` 必须唯一且覆盖 1..7
   - `sustainable_columns` 至少 3 条
   - `growth_experiment_suggestion` 至少 1 条
+- 上下文注入策略（服务层内部）：
+  - 请求会注入 `context_bundle`（身份模型、人格宪法、能力画像、风险边界及来源元数据）
+  - 若请求未传 `identity_model_id` / `constitution_id`，服务会自动解析并回填后再生成
+  - 若无法解析上下文，仍生成通用启动包（兼容模式）
 - 成功响应：
   - 顶层：`id`, `user_id`
   - `days[]` 仅返回 `day_no`, `theme`, `opening_text`
@@ -441,6 +451,7 @@
 - 可靠性策略：
   - 当 LLM 输出结构不合规时，服务端会执行最多 2 次 schema 修复重试
   - 若 2 次重试仍不合规，返回 `502`（错误体 message 会包含重试耗尽信息）
+  - 服务内部会记录关键耗时日志：`context_resolve_ms` / `llm_generate_ms` / `schema_repair_attempts` / `total_ms`
 - 典型错误：`502`, `422`
 
 注意：若需要 `draft_or_outline`，请调用 `GET /v1/launch-kits/{kit_id}`。

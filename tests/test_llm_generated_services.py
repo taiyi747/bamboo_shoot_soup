@@ -12,6 +12,7 @@ from app.db.base import Base
 from app.models.consistency_check import ConsistencyCheck
 from app.models.identity_model import IdentityModel, IdentitySelection
 from app.models.launch_kit import LaunchKit
+from app.models.onboarding import CapabilityProfile, OnboardingSession
 from app.models.persona import PersonaConstitution, RiskBoundaryItem
 from app.models.user import User
 from app.services import consistency_check as consistency_service
@@ -321,8 +322,178 @@ def test_generate_launch_kit_creates_7_days(monkeypatch, tmp_path) -> None:
     assert len(kit.days) == 7
     assert [day.day_no for day in kit.days] == [1, 2, 3, 4, 5, 6, 7]
     prompt = fake_client.calls[0]["system_prompt"]
-    assert "需要为创作者生成 7 天启动包 JSON" in prompt
-    assert "只返回严格 JSON 对象" in prompt
+    assert "Return strict JSON only." in prompt
+    assert "Context alignment constraints:" in prompt
+    _close_db(db)
+
+
+def test_generate_launch_kit_injects_context_bundle_from_saved_records(monkeypatch, tmp_path) -> None:
+    db, user_id = _make_db_session(tmp_path)
+    fake_client = _FakeLLMClient({"generate_launch_kit": _valid_launch_kit_payload()})
+    monkeypatch.setattr(launch_kit_service, "get_llm_client", lambda: fake_client)
+
+    session = OnboardingSession(user_id=user_id, status="completed", questionnaire_responses="{}")
+    db.add(session)
+    db.flush()
+    profile = CapabilityProfile(
+        session_id=session.id,
+        user_id=user_id,
+        skill_stack_json=json.dumps(["python", "writing"], ensure_ascii=False),
+        interest_energy_curve_json=json.dumps([{"topic": "growth"}], ensure_ascii=False),
+        cognitive_style="structured",
+        value_boundaries_json=json.dumps(["no fake claims"], ensure_ascii=False),
+        risk_tolerance=2,
+        time_investment_hours=6,
+    )
+    identity = IdentityModel(
+        user_id=user_id,
+        session_id=session.id,
+        title="Growth Coach",
+        target_audience_pain="Inconsistent publishing",
+        content_pillars_json=json.dumps(["pillar-1", "pillar-2", "pillar-3"], ensure_ascii=False),
+        tone_keywords_json=json.dumps(["clear", "calm"], ensure_ascii=False),
+        tone_examples_json=json.dumps(["e1", "e2", "e3", "e4", "e5"], ensure_ascii=False),
+        long_term_views_json=json.dumps(["v1", "v2", "v3", "v4", "v5"], ensure_ascii=False),
+        differentiation="Evidence-first workflow",
+        growth_path_0_3m="Publish weekly",
+        growth_path_3_12m="Build products",
+        monetization_validation_order_json=json.dumps(["lead", "pilot"], ensure_ascii=False),
+        risk_boundary_json=json.dumps(["no guarantee claims"], ensure_ascii=False),
+    )
+    db.add_all([profile, identity])
+    db.flush()
+    selection = IdentitySelection(user_id=user_id, primary_identity_id=identity.id, backup_identity_id=None)
+    constitution = PersonaConstitution(
+        user_id=user_id,
+        identity_model_id=identity.id,
+        common_words_json=json.dumps(["clarity", "system", "evidence"], ensure_ascii=False),
+        forbidden_words_json=json.dumps(["guarantee", "overnight", "secret"], ensure_ascii=False),
+        sentence_preferences_json=json.dumps(["one claim", "one proof", "one action"], ensure_ascii=False),
+        moat_positions_json=json.dumps(["truthful", "repeatable", "ethical"], ensure_ascii=False),
+        narrative_mainline="Build repeatable growth systems.",
+        growth_arc_template="Problem -> Method -> Proof",
+        version=1,
+    )
+    db.add_all([selection, constitution])
+    db.flush()
+    boundary = RiskBoundaryItem(
+        user_id=user_id,
+        identity_model_id=identity.id,
+        constitution_id=constitution.id,
+        risk_level=4,
+        boundary_type="platform",
+        statement="Do not claim guaranteed outcomes.",
+        source="user_input",
+    )
+    db.add(boundary)
+    db.commit()
+
+    kit = launch_kit_service.generate_launch_kit(db=db, user_id=user_id)
+
+    assert kit.identity_model_id == identity.id
+    assert kit.constitution_id == constitution.id
+    payload = fake_client.calls[0]["user_payload"]
+    context_bundle = payload["context_bundle"]
+    resolution_meta = context_bundle["resolution_meta"]
+    assert resolution_meta["identity_model_source"] == "selection"
+    assert resolution_meta["persona_constitution_source"] == "identity"
+    assert resolution_meta["capability_profile_source"] == "session"
+    assert resolution_meta["risk_boundaries_source"] == "constitution"
+    assert isinstance(context_bundle["identity_model"]["content_pillars"], list)
+    assert len(context_bundle["identity_model"]["tone_examples"]) <= 3
+    assert len(context_bundle["risk_boundaries"]) <= 6
+    _close_db(db)
+
+
+def test_generate_launch_kit_resolves_missing_constitution_id_from_identity(monkeypatch, tmp_path) -> None:
+    db, user_id = _make_db_session(tmp_path)
+    fake_client = _FakeLLMClient({"generate_launch_kit": _valid_launch_kit_payload()})
+    monkeypatch.setattr(launch_kit_service, "get_llm_client", lambda: fake_client)
+
+    identity = IdentityModel(user_id=user_id, title="Resolver Identity")
+    db.add(identity)
+    db.flush()
+    constitution = PersonaConstitution(
+        user_id=user_id,
+        identity_model_id=identity.id,
+        common_words_json=json.dumps(["a", "b", "c"], ensure_ascii=False),
+        forbidden_words_json=json.dumps(["x", "y", "z"], ensure_ascii=False),
+        sentence_preferences_json=json.dumps(["p1", "p2", "p3"], ensure_ascii=False),
+        moat_positions_json=json.dumps(["m1", "m2", "m3"], ensure_ascii=False),
+        narrative_mainline="Mainline",
+        growth_arc_template="Arc",
+        version=1,
+    )
+    db.add(constitution)
+    db.commit()
+
+    kit = launch_kit_service.generate_launch_kit(
+        db=db,
+        user_id=user_id,
+        identity_model_id=identity.id,
+    )
+
+    assert kit.constitution_id == constitution.id
+    resolution_meta = fake_client.calls[0]["user_payload"]["context_bundle"]["resolution_meta"]
+    assert resolution_meta["persona_constitution_source"] == "identity"
+    _close_db(db)
+
+
+def test_generate_launch_kit_fallbacks_when_ids_invalid_or_missing(monkeypatch, tmp_path) -> None:
+    db, user_id = _make_db_session(tmp_path)
+    fake_client = _FakeLLMClient({"generate_launch_kit": _valid_launch_kit_payload()})
+    monkeypatch.setattr(launch_kit_service, "get_llm_client", lambda: fake_client)
+
+    latest_identity = IdentityModel(user_id=user_id, title="Latest Identity")
+    db.add(latest_identity)
+    db.flush()
+    related_constitution = PersonaConstitution(
+        user_id=user_id,
+        identity_model_id=latest_identity.id,
+        common_words_json=json.dumps(["a", "b", "c"], ensure_ascii=False),
+        forbidden_words_json=json.dumps(["x", "y", "z"], ensure_ascii=False),
+        sentence_preferences_json=json.dumps(["p1", "p2", "p3"], ensure_ascii=False),
+        moat_positions_json=json.dumps(["m1", "m2", "m3"], ensure_ascii=False),
+        narrative_mainline="Mainline",
+        growth_arc_template="Arc",
+        version=1,
+    )
+    db.add(related_constitution)
+    db.commit()
+
+    kit = launch_kit_service.generate_launch_kit(
+        db=db,
+        user_id=user_id,
+        identity_model_id="missing-identity",
+        constitution_id="missing-constitution",
+    )
+
+    assert kit.identity_model_id == latest_identity.id
+    assert kit.constitution_id == related_constitution.id
+    resolution_meta = fake_client.calls[0]["user_payload"]["context_bundle"]["resolution_meta"]
+    assert resolution_meta["identity_model_source"] == "latest"
+    assert resolution_meta["persona_constitution_source"] == "identity"
+    _close_db(db)
+
+
+def test_generate_launch_kit_without_any_context_still_generates_generic_output(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    db, user_id = _make_db_session(tmp_path)
+    fake_client = _FakeLLMClient({"generate_launch_kit": _valid_launch_kit_payload()})
+    monkeypatch.setattr(launch_kit_service, "get_llm_client", lambda: fake_client)
+
+    kit = launch_kit_service.generate_launch_kit(db=db, user_id=user_id)
+
+    assert kit.identity_model_id is None
+    assert kit.constitution_id is None
+    resolution_meta = fake_client.calls[0]["user_payload"]["context_bundle"]["resolution_meta"]
+    assert resolution_meta["identity_model_source"] == "none"
+    assert resolution_meta["persona_constitution_source"] == "none"
+    assert resolution_meta["capability_profile_source"] == "none"
+    assert resolution_meta["risk_boundaries_source"] == "none"
+    assert fake_client.calls[0]["user_payload"]["context_bundle"]["risk_boundaries"] == []
     _close_db(db)
 
 
@@ -441,7 +612,7 @@ def test_generate_launch_kit_retries_schema_then_succeeds(monkeypatch, tmp_path)
     assert kit.id is not None
     assert len(kit.days) == 7
     assert len([c for c in fake_client.calls if c["operation"] == "generate_launch_kit"]) == 2
-    assert "你正在修复一个不合法的 7 天启动包 JSON" in fake_client.calls[1]["system_prompt"]
+    assert "You are repairing an invalid 7-day launch kit JSON." in fake_client.calls[1]["system_prompt"]
     _close_db(db)
 
 

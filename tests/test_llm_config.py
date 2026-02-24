@@ -74,3 +74,21 @@ def test_debug_flag_defaults_false_and_supports_boolean_strings() -> None:
     assert default_settings.debug is False
     assert enabled_settings.debug is True
     assert disabled_settings.debug is False
+
+
+def test_reasoning_flag_defaults_none_and_supports_boolean_strings() -> None:
+    default_settings = Settings(_env_file=None)
+    enabled_settings = Settings(_env_file=None, reasoning="true")
+    disabled_settings = Settings(_env_file=None, reasoning="false")
+
+    assert default_settings.reasoning is None
+    assert enabled_settings.reasoning is True
+    assert disabled_settings.reasoning is False
+
+
+def test_legacy_reason_falls_back_to_reasoning() -> None:
+    legacy_enabled_settings = Settings(_env_file=None, reason="true")
+    legacy_disabled_settings = Settings(_env_file=None, reason="false")
+
+    assert legacy_enabled_settings.reasoning is True
+    assert legacy_disabled_settings.reasoning is False
