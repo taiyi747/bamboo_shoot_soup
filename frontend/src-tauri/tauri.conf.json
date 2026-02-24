@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "bamboo_shoot_soup",
+  "productName": "Bamboo Shoot Soup",
   "version": "0.1.0",
-  "identifier": "com.awords.bamboo_shoot_soup",
+  "identifier": "com.awords.bambooshootsoup",
   "build": {
     "frontendDist": "../.output/public",
     "devUrl": "http://127.0.0.1:3000",
