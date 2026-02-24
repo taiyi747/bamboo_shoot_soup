@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useApiClient } from '../services/api/client'
+import { computed, ref } from 'vue'
 
 const api = useApiClient()
 const { track } = useAnalytics()
@@ -80,101 +81,186 @@ const saveSelection = async () => {
     saving.value = false
   }
 }
+
+const hasModels = computed(() => state.value.identityModels.length > 0)
 </script>
 
 <template>
-  <UCard class="surface-card">
-    <template #header>
-      <h2 class="text-xl font-semibold text-slate-900">
-        身份模型生成与选择
-      </h2>
-      <p class="mt-1 text-sm text-slate-600">
-        系统将生成 3 个候选身份模型，支持主/备身份选择并做强规则校验。
-      </p>
-    </template>
+  <div class="space-y-6 max-w-[1200px] mx-auto w-full">
+    <UCard class="surface-card ring-1 ring-slate-200 dark:ring-slate-800">
+      <template #header>
+         <div class="flex items-center gap-4">
+          <div class="p-3 bg-primary-50 dark:bg-primary-950 rounded-2xl">
+            <UIcon name="i-lucide-users" class="w-8 h-8 text-primary-500" />
+          </div>
+          <div class="flex-1">
+            <h2 class="text-2xl font-bold text-slate-900 dark:text-white">
+              身份模型生成与选择
+            </h2>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+              基于你的能力画像，我们将生成 3 个潜力身份模型。请挑选 1 个主身份和 1 个备选身份。
+            </p>
+          </div>
+          
+          <div v-if="hasModels" class="hidden sm:flex items-center gap-3">
+               <UButton
+                color="neutral"
+                variant="outline"
+                class="touch-target"
+                size="lg"
+                icon="i-lucide-refresh-cw"
+                :loading="loading"
+                @click="generateModels"
+              >
+                重新生成
+              </UButton>
+              <UButton
+                color="primary"
+                class="touch-target shadow-md font-semibold"
+                size="lg"
+                trailing-icon="i-lucide-arrow-right"
+                :loading="saving"
+                @click="saveSelection"
+              >
+                保存选择并继续
+              </UButton>
+          </div>
+        </div>
+      </template>
 
-    <UAlert
-      v-if="errorMessage"
-      color="error"
-      variant="soft"
-      title="操作失败"
-      :description="errorMessage"
-      class="mb-4"
-    />
+      <UAlert
+        v-if="errorMessage"
+        color="error"
+        variant="soft"
+        title="操作失败"
+        :description="errorMessage"
+        icon="i-lucide-alert-circle"
+        class="mb-6"
+      />
 
-    <div class="mb-4 flex flex-wrap gap-3">
-      <UButton :loading="loading" class="touch-target" @click="generateModels">
-        生成 3-5 个身份模型
-      </UButton>
-      <UButton
-        color="neutral"
-        variant="outline"
-        class="touch-target"
-        :disabled="state.identityModels.length === 0"
-        @click="saveSelection"
-      >
-        保存选择并进入人格宪法
-      </UButton>
-    </div>
+      <div v-if="!hasModels" class="flex flex-col items-center justify-center py-16 px-4 text-center border border-dashed border-slate-300 dark:border-slate-800 rounded-3xl">
+         <div class="w-20 h-20 bg-emerald-50 dark:bg-emerald-950/30 rounded-full flex items-center justify-center mb-6">
+           <UIcon name="i-lucide-sparkles" class="w-10 h-10 text-emerald-500" />
+         </div>
+         <h3 class="text-xl font-semibold mb-2">还未生成身份模型</h3>
+         <p class="text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-8">
+           点击下方按钮，我们的 Agent 将根据你填写的画像信息，智能推演出适合你的多维身份模型。
+         </p>
+         <UButton 
+            size="xl" 
+            :loading="loading" 
+            class="touch-target shadow-lg px-8 font-semibold" 
+            color="primary"
+            icon="i-lucide-wand-2" 
+            @click="generateModels"
+          >
+            立即生成身份模型
+          </UButton>
+      </div>
 
-    <div class="grid gap-4 lg:grid-cols-3">
-      <UCard
-        v-for="model in state.identityModels"
-        :key="model.id"
-        class="surface-card"
-      >
-        <template #header>
-          <div class="flex items-center justify-between gap-2">
-            <h3 class="text-base font-semibold text-slate-900">
-              {{ model.title }}
-            </h3>
-            <UBadge v-if="selectedPrimaryId === model.id" color="primary">
-              主身份
+      <div v-else class="grid gap-6 lg:grid-cols-3">
+        <UCard
+          v-for="model in state.identityModels"
+          :key="model.id"
+          class="relative flex flex-col group transition-all duration-300"
+          :class="{
+            'ring-2 ring-primary-500 shadow-xl dark:bg-primary-950/10': selectedPrimaryId === model.id,
+            'ring-2 ring-emerald-300/50 shadow-lg': selectedBackupId === model.id,
+            'ring-1 ring-slate-200 dark:ring-slate-800 hover:shadow-lg': selectedPrimaryId !== model.id && selectedBackupId !== model.id
+          }"
+        >
+          <div v-if="selectedPrimaryId === model.id" class="absolute -top-3 -right-3 badge-lg z-10">
+            <UBadge color="primary" size="lg" class="shadow-lg font-bold px-3 py-1">
+               <UIcon name="i-lucide-star" class="mr-1" /> 主身份
             </UBadge>
           </div>
-        </template>
-
-        <div class="space-y-2 text-sm text-slate-700">
-          <p><span class="font-semibold">目标痛点：</span>{{ model.targetAudiencePain }}</p>
-          <p><span class="font-semibold">差异化定位：</span>{{ model.differentiation }}</p>
-          <p><span class="font-semibold">内容支柱：</span>{{ model.contentPillars.join(' / ') }}</p>
-          <p>
-            <span class="font-semibold">语气示例条数：</span>{{ model.toneExamples.length }}
-          </p>
-        </div>
-
-        <template #footer>
-          <div class="flex gap-2">
-            <UButton
-              class="touch-target"
-              size="sm"
-              :color="selectedPrimaryId === model.id ? 'primary' : 'neutral'"
-              :variant="selectedPrimaryId === model.id ? 'solid' : 'outline'"
-              @click="selectedPrimaryId = model.id"
-            >
-              设为主身份
-            </UButton>
-            <UButton
-              class="touch-target"
-              size="sm"
-              :color="selectedBackupId === model.id ? 'secondary' : 'neutral'"
-              :variant="selectedBackupId === model.id ? 'solid' : 'outline'"
-              @click="selectedBackupId = model.id"
-            >
-              设为备身份
-            </UButton>
+          <div v-if="selectedBackupId === model.id" class="absolute -top-3 -right-3 badge-lg z-10">
+            <UBadge color="success" variant="soft" size="lg" class="shadow-md font-bold px-3 py-1 ring-1 ring-emerald-300">
+               <UIcon name="i-lucide-shield-plus" class="mr-1" /> 备身份
+            </UBadge>
           </div>
-        </template>
-      </UCard>
-    </div>
 
-    <div v-if="state.identityModels.length > 0" class="mt-4">
-      <UAlert
-        color="info"
-        variant="soft"
-        title="当前选择"
-        :description="`主身份：${selectedPrimaryId || '未选择'}；备身份：${selectedBackupId || '未选择'}`"
-      />
-    </div>
-  </UCard>
+          <template #header>
+            <div class="flex items-start justify-between">
+              <h3 class="text-lg font-bold text-slate-900 dark:text-white leading-tight">
+                {{ model.title }}
+              </h3>
+            </div>
+          </template>
+
+          <div class="flex-1 space-y-4 text-sm text-slate-600 dark:text-slate-300">
+            <div class="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg">
+              <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wider">差异化定位</p>
+              <p class="font-medium">{{ model.differentiation }}</p>
+            </div>
+            
+            <div>
+               <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wider">目标受众痛点</p>
+               <p>{{ model.targetAudiencePain }}</p>
+            </div>
+
+            <div>
+               <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">内容支柱 (Pillars)</p>
+               <div class="flex flex-wrap gap-2">
+                 <UBadge v-for="pillar in model.contentPillars.slice(0,3)" :key="pillar" color="neutral" variant="soft">{{ pillar }}</UBadge>
+                 <span v-if="model.contentPillars.length > 3" class="text-xs pt-1">...</span>
+               </div>
+            </div>
+
+            <div class="flex items-center gap-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+              <UIcon name="i-lucide-message-square-quote" class="w-4 h-4 text-slate-400" />
+              <p class="text-xs font-medium">
+                生成了 <span class="text-emerald-600 dark:text-emerald-400 font-bold">{{ model.toneExamples.length }}</span> 条语气风格示例
+              </p>
+            </div>
+          </div>
+
+          <template #footer>
+            <div class="grid grid-cols-2 gap-2 mt-auto">
+              <UButton
+                class="touch-target justify-center font-medium transition-colors"
+                :color="selectedPrimaryId === model.id ? 'primary' : 'neutral'"
+                :variant="selectedPrimaryId === model.id ? 'solid' : 'outline'"
+                @click="selectedPrimaryId = model.id; if(selectedBackupId === model.id) selectedBackupId = undefined"
+              >
+                设为主身份
+              </UButton>
+              <UButton
+                class="touch-target justify-center font-medium transition-colors"
+                :color="selectedBackupId === model.id ? 'success' : 'neutral'"
+                :variant="selectedBackupId === model.id ? 'soft' : 'outline'"
+                @click="selectedBackupId = model.id; if(selectedPrimaryId === model.id) selectedPrimaryId = undefined"
+              >
+                设为备身份
+              </UButton>
+            </div>
+          </template>
+        </UCard>
+      </div>
+
+       <div v-if="hasModels" class="mt-6 sm:hidden flex flex-col gap-3 pt-6 border-t border-slate-200 dark:border-slate-800">
+           <UButton
+            color="neutral"
+            variant="outline"
+            class="touch-target justify-center"
+            size="lg"
+            icon="i-lucide-refresh-cw"
+            :loading="loading"
+            @click="generateModels"
+          >
+            重新生成
+          </UButton>
+          <UButton
+            color="primary"
+            class="touch-target shadow-md font-semibold justify-center"
+            size="lg"
+            trailing-icon="i-lucide-arrow-right"
+            :loading="saving"
+            @click="saveSelection"
+          >
+            保存选择并继续
+          </UButton>
+      </div>
+    </UCard>
+  </div>
 </template>
