@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { exportDeliveryJsonPackage, type DeliveryPackagePayload } from '../services/export/delivery'
+
 const toast = useToast()
 const { state, selectedPrimaryModel, selectedBackupModel, reset } = useMvpFlow()
 
@@ -6,7 +8,7 @@ const hasCoreArtifacts = computed(
   () => Boolean(selectedPrimaryModel.value && state.value.persona && state.value.launchKit && state.value.consistencyCheck)
 )
 
-const exportJson = () => {
+const exportJson = async () => {
   if (!hasCoreArtifacts.value) {
     toast.add({
       title: '导出失败',
@@ -16,33 +18,43 @@ const exportJson = () => {
     return
   }
 
-  const payload = JSON.stringify(
-    {
-      profile: state.value.profile,
-      primaryIdentity: selectedPrimaryModel.value,
-      backupIdentity: selectedBackupModel.value,
-      constitution: state.value.persona,
-      launchKit: state.value.launchKit,
-      consistencyCheck: state.value.consistencyCheck,
-      events: state.value.events,
-    },
-    null,
-    2
-  )
+  const payload: DeliveryPackagePayload = {
+    profile: state.value.profile,
+    primaryIdentity: selectedPrimaryModel.value,
+    backupIdentity: selectedBackupModel.value,
+    constitution: state.value.persona,
+    launchKit: state.value.launchKit,
+    consistencyCheck: state.value.consistencyCheck,
+    events: state.value.events,
+  }
 
-  const blob = new Blob([payload], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = "bss-identity-review-" + Date.now() + ".json"
-  link.click()
-  URL.revokeObjectURL(url)
+  try {
+    const result = await exportDeliveryJsonPackage(payload)
 
-  toast.add({
-    title: '导出完成',
-    description: '交付汇总 JSON 已生成并下载。',
-    color: 'success',
-  })
+    if (result.status === 'cancelled') {
+      toast.add({
+        title: '已取消导出',
+        description: '你已取消保存 JSON 交付包。',
+        color: 'neutral',
+      })
+      return
+    }
+
+    toast.add({
+      title: '导出完成',
+      description:
+        result.channel === 'tauri'
+          ? '交付汇总 JSON 已保存到你选择的位置。'
+          : '交付汇总 JSON 已生成并下载。',
+      color: 'success',
+    })
+  } catch (error) {
+    toast.add({
+      title: '导出失败',
+      description: error instanceof Error ? error.message : '导出 JSON 交付包失败，请稍后重试。',
+      color: 'error',
+    })
+  }
 }
 
 const startOver = async () => {
