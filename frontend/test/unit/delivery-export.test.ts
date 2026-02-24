@@ -45,6 +45,7 @@ describe('exportDeliveryJsonPackage', () => {
     const [writtenPath, writtenPayload] = vi.mocked(writeTextFile).mock.calls[0]
     expect(writtenPath).toBe('C:/tmp/review.json')
     expect(writtenPayload).toContain('"events": []')
+    expect(writtenPayload).toContain('"schema_version": "1.1.0"')
     expect(result).toEqual({
       status: 'saved',
       channel: 'tauri',

@@ -35,7 +35,9 @@ class LaunchKitResponse(BaseModel):
     identity_model_id: str | None = None
     constitution_id: str | None = None
     sustainable_columns_json: str
+    sustainable_columns: list[str] = Field(default_factory=list)
     growth_experiment_suggestion_json: str
+    growth_experiment_suggestion: list[dict] = Field(default_factory=list)
     created_at: datetime
     days: list[LaunchKitDayResponse] = []
 

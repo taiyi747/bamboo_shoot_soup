@@ -35,8 +35,11 @@ class ConsistencyCheckResponse(BaseModel):
     constitution_id: str | None = None
     draft_text: str
     deviation_items_json: str
+    deviation_items: list[str] = Field(default_factory=list)
     deviation_reasons_json: str
+    deviation_reasons: list[str] = Field(default_factory=list)
     suggestions_json: str
+    suggestions: list[str] = Field(default_factory=list)
     risk_triggered: bool
     risk_warning: str
     created_at: datetime

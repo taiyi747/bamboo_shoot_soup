@@ -21,6 +21,12 @@ const createFlowState = (): MvpFlowState => ({
   },
   identityModels: [],
   draftToCheck: '',
+  contentMatrixes: [],
+  experiments: [],
+  monetizationMaps: [],
+  identityPortfolios: [],
+  simulatorEvaluations: [],
+  viewpointAssets: [],
   events: [],
 })
 
@@ -40,7 +46,7 @@ describe('default layout', () => {
     colorModeState.preference = 'light'
   })
 
-  it('renders all six mvp step entries with compact nav classes', async () => {
+  it('renders expanded workflow step entries with compact nav classes', async () => {
     const DefaultLayout = (await import('../../app/layouts/default.vue')).default
     const wrapper = await mountSuspended(DefaultLayout, {
       slots: {
@@ -48,7 +54,20 @@ describe('default layout', () => {
       },
     })
 
-    const labels = ['身份诊断', '身份模型', '人格宪法', '启动包', '一致性检查', '交付汇总']
+    const labels = [
+      '身份诊断',
+      '身份模型',
+      '人格宪法',
+      '启动包',
+      '一致性检查',
+      '交付汇总',
+      '内容矩阵',
+      '增长实验',
+      '变现路线图',
+      '身份组合',
+      '发布模拟器',
+      '资产库',
+    ]
     for (const label of labels) {
       expect(wrapper.text()).toContain(label)
     }
@@ -57,10 +76,10 @@ describe('default layout', () => {
     expect(nav.exists()).toBe(true)
 
     const navLinks = wrapper.findAll('.step-nav-link')
-    expect(navLinks).toHaveLength(6)
+    expect(navLinks).toHaveLength(12)
 
     const stepButtons = wrapper.findAll('.step-nav-button')
-    expect(stepButtons).toHaveLength(6)
+    expect(stepButtons).toHaveLength(12)
     for (const button of stepButtons) {
       expect(button.classes()).toContain('touch-target')
     }

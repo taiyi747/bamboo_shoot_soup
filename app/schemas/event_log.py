@@ -24,6 +24,7 @@ class EventLogResponse(BaseModel):
     stage: str
     identity_model_id: str | None = None
     payload_json: str
+    payload: dict[str, Any] = Field(default_factory=dict)
     occurred_at: datetime
 
     model_config = {"from_attributes": True}

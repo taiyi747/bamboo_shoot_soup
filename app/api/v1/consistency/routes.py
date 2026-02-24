@@ -1,5 +1,6 @@
 """一致性检查 API 路由。"""
 
+import json
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -60,6 +61,9 @@ def create_consistency_check(
             "deviation_items": check.deviation_items_json,
             "deviation_reasons": check.deviation_reasons_json,
             "suggestions": check.suggestions_json,
+            "deviation_items_typed": json.loads(check.deviation_items_json),
+            "deviation_reasons_typed": json.loads(check.deviation_reasons_json),
+            "suggestions_typed": json.loads(check.suggestions_json),
             "risk_triggered": check.risk_triggered,
             "risk_warning": check.risk_warning,
             "degraded": result.degraded,

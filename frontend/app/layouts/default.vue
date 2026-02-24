@@ -10,6 +10,12 @@ const steps = [
   { to: '/launch-kit', label: '启动包', icon: 'i-lucide-rocket' },
   { to: '/consistency-check', label: '一致性检查', icon: 'i-lucide-check-circle' },
   { to: '/review', label: '交付汇总', icon: 'i-lucide-package-check' },
+  { to: '/content-matrix', label: '内容矩阵', icon: 'i-lucide-grid-2x2' },
+  { to: '/experiments', label: '增长实验', icon: 'i-lucide-flask-conical' },
+  { to: '/monetization-map', label: '变现路线图', icon: 'i-lucide-map' },
+  { to: '/identity-portfolio', label: '身份组合', icon: 'i-lucide-layers-3' },
+  { to: '/simulator', label: '发布模拟器', icon: 'i-lucide-gauge' },
+  { to: '/asset-library', label: '资产库', icon: 'i-lucide-library' },
 ]
 
 const canVisit = (to: string) => {
@@ -19,6 +25,12 @@ const canVisit = (to: string) => {
   if (to === '/launch-kit') return Boolean(s.persona)
   if (to === '/consistency-check') return Boolean(s.launchKit)
   if (to === '/review') return Boolean(s.consistencyCheck)
+  if (to === '/content-matrix') return Boolean(s.consistencyCheck)
+  if (to === '/experiments') return s.contentMatrixes.length > 0
+  if (to === '/monetization-map') return s.experiments.length > 0
+  if (to === '/identity-portfolio') return Boolean(s.selectedPrimaryId)
+  if (to === '/simulator') return Boolean(s.launchKit)
+  if (to === '/asset-library') return s.simulatorEvaluations.length > 0 || s.viewpointAssets.length > 0
   return true
 }
 

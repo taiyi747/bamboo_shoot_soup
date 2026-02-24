@@ -1,0 +1,1 @@
+"""Viewpoint assets API package."""

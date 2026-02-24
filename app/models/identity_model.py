@@ -7,6 +7,7 @@ from sqlalchemy import DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.utils.json_fields import parse_json_array
 
 
 def _new_id() -> str:
@@ -46,6 +47,30 @@ class IdentityModel(Base):
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
     )
+
+    @property
+    def content_pillars(self) -> list[str]:
+        return [str(item) for item in parse_json_array(self.content_pillars_json)]
+
+    @property
+    def tone_keywords(self) -> list[str]:
+        return [str(item) for item in parse_json_array(self.tone_keywords_json)]
+
+    @property
+    def tone_examples(self) -> list[str]:
+        return [str(item) for item in parse_json_array(self.tone_examples_json)]
+
+    @property
+    def long_term_views(self) -> list[str]:
+        return [str(item) for item in parse_json_array(self.long_term_views_json)]
+
+    @property
+    def monetization_validation_order(self) -> list[str]:
+        return [str(item) for item in parse_json_array(self.monetization_validation_order_json)]
+
+    @property
+    def risk_boundary(self) -> list[str]:
+        return [str(item) for item in parse_json_array(self.risk_boundary_json)]
 
 
 class IdentitySelection(Base):

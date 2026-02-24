@@ -1,5 +1,7 @@
 """FastAPI 应用入口与启动阶段校验。"""
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -11,10 +13,40 @@ from app.services.llm_client import ensure_llm_ready
 
 settings = get_settings()
 
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Run startup checks before serving requests."""
+    initialize_database()
+    validate_runtime_configuration()
+    yield
+
+
+def initialize_database() -> None:
+    """Compatibility entrypoint for startup migration checks."""
+    try:
+        upgrade_database_to_head()
+    except Exception as exc:
+        raise RuntimeError(
+            f"Application startup failed due to database migration error: {exc}"
+        ) from exc
+
+
+def validate_runtime_configuration() -> None:
+    """Compatibility entrypoint for startup LLM checks."""
+    try:
+        ensure_llm_ready()
+    except Exception as exc:
+        raise RuntimeError(
+            f"Application startup failed due to invalid LLM configuration: {exc}"
+        ) from exc
+
+
 app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
     debug=settings.debug,
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -27,24 +59,3 @@ app.add_middleware(
 
 app.include_router(health_router)
 app.include_router(v1_router)
-
-
-@app.on_event("startup")
-def initialize_database() -> None:
-    try:
-        upgrade_database_to_head()
-    except Exception as exc:
-        raise RuntimeError(
-            f"Application startup failed due to database migration error: {exc}"
-        ) from exc
-
-
-@app.on_event("startup")
-def validate_runtime_configuration() -> None:
-    # 启动即失败（fail-fast）：避免请求进来后才发现 LLM 配置缺失。
-    try:
-        ensure_llm_ready()
-    except Exception as exc:
-        raise RuntimeError(
-            f"Application startup failed due to invalid LLM configuration: {exc}"
-        ) from exc

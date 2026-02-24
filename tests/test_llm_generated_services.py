@@ -8,11 +8,17 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.db.base import Base
+from app.models.content_matrix import ContentMatrix, ContentTopic
 from app.models.consistency_check import ConsistencyCheck
+from app.models.growth_experiment import GrowthExperiment
 from app.models.identity_model import IdentityModel, IdentitySelection
+from app.models.identity_portfolio import IdentityPortfolio
 from app.models.launch_kit import LaunchKit
+from app.models.monetization import MonetizationMap
 from app.models.persona import PersonaConstitution, RiskBoundaryItem
+from app.models.simulator import PrepublishEvaluation
 from app.models.user import User
+from app.models.viewpoint_asset import ViewpointAsset
 from app.services import consistency_check as consistency_service
 from app.services import identity_model as identity_service
 from app.services import launch_kit as launch_kit_service
@@ -280,13 +286,80 @@ def test_generate_identity_models_clears_previous_selection_and_unlinks_dependen
         identity_model_id=first_batch[0].id,
         draft_text="test draft",
     )
-    db.add_all([constitution, boundary, launch_kit, check])
+    matrix = ContentMatrix(
+        user_id=user_id,
+        identity_model_id=first_batch[0].id,
+        pillar="P1",
+        platform="xhs",
+        format="post",
+    )
+    topic = ContentTopic(
+        matrix=matrix,
+        user_id=user_id,
+        identity_model_id=first_batch[0].id,
+        title="topic",
+        platform="xhs",
+        format="post",
+    )
+    experiment = GrowthExperiment(
+        user_id=user_id,
+        identity_model_id=first_batch[0].id,
+        hypothesis="hypothesis",
+    )
+    monetization_map = MonetizationMap(
+        user_id=user_id,
+        identity_model_id=first_batch[0].id,
+        title="map",
+    )
+    portfolio = IdentityPortfolio(
+        user_id=user_id,
+        primary_identity_id=first_batch[0].id,
+        backup_identity_id=first_batch[1].id,
+        anonymous_identity="anon",
+        tool_identity="tool",
+        conflict_avoidance="avoid",
+        asset_reuse_strategy="reuse",
+    )
+    evaluation = PrepublishEvaluation(
+        user_id=user_id,
+        identity_model_id=first_batch[0].id,
+        platform="xhs",
+        stage_goal="growth",
+    )
+    asset = ViewpointAsset(
+        user_id=user_id,
+        identity_model_id=first_batch[0].id,
+        topic="topic",
+        platform="xhs",
+    )
+    db.add_all(
+        [
+            constitution,
+            boundary,
+            launch_kit,
+            check,
+            matrix,
+            topic,
+            experiment,
+            monetization_map,
+            portfolio,
+            evaluation,
+            asset,
+        ]
+    )
     db.commit()
 
     constitution_id = constitution.id
     boundary_id = boundary.id
     launch_kit_id = launch_kit.id
     check_id = check.id
+    matrix_id = matrix.id
+    topic_id = topic.id
+    experiment_id = experiment.id
+    monetization_map_id = monetization_map.id
+    evaluation_id = evaluation.id
+    asset_id = asset.id
+    portfolio_id = portfolio.id
     old_ids = {model.id for model in first_batch}
 
     second_batch = identity_service.generate_identity_models(
@@ -308,6 +381,17 @@ def test_generate_identity_models_clears_previous_selection_and_unlinks_dependen
     refreshed_boundary = db.query(RiskBoundaryItem).filter(RiskBoundaryItem.id == boundary_id).first()
     refreshed_launch_kit = db.query(LaunchKit).filter(LaunchKit.id == launch_kit_id).first()
     refreshed_check = db.query(ConsistencyCheck).filter(ConsistencyCheck.id == check_id).first()
+    refreshed_matrix = db.query(ContentMatrix).filter(ContentMatrix.id == matrix_id).first()
+    refreshed_topic = db.query(ContentTopic).filter(ContentTopic.id == topic_id).first()
+    refreshed_experiment = db.query(GrowthExperiment).filter(GrowthExperiment.id == experiment_id).first()
+    refreshed_monetization_map = (
+        db.query(MonetizationMap).filter(MonetizationMap.id == monetization_map_id).first()
+    )
+    refreshed_evaluation = (
+        db.query(PrepublishEvaluation).filter(PrepublishEvaluation.id == evaluation_id).first()
+    )
+    refreshed_asset = db.query(ViewpointAsset).filter(ViewpointAsset.id == asset_id).first()
+    refreshed_portfolio = db.query(IdentityPortfolio).filter(IdentityPortfolio.id == portfolio_id).first()
     current_models = identity_service.get_user_identity_models(db, user_id)
 
     assert len(second_batch) == 3
@@ -317,11 +401,49 @@ def test_generate_identity_models_clears_previous_selection_and_unlinks_dependen
     assert refreshed_boundary is not None
     assert refreshed_launch_kit is not None
     assert refreshed_check is not None
+    assert refreshed_matrix is not None
+    assert refreshed_topic is not None
+    assert refreshed_experiment is not None
+    assert refreshed_monetization_map is not None
+    assert refreshed_evaluation is not None
+    assert refreshed_asset is not None
     assert refreshed_constitution.identity_model_id is None
     assert refreshed_boundary.identity_model_id is None
     assert refreshed_launch_kit.identity_model_id is None
     assert refreshed_check.identity_model_id is None
+    assert refreshed_matrix.identity_model_id is None
+    assert refreshed_topic.identity_model_id is None
+    assert refreshed_experiment.identity_model_id is None
+    assert refreshed_monetization_map.identity_model_id is None
+    assert refreshed_evaluation.identity_model_id is None
+    assert refreshed_asset.identity_model_id is None
+    assert refreshed_portfolio is None
     assert {model.id for model in current_models} == second_ids
+    _close_db(db)
+
+
+def test_generate_identity_models_auto_creates_missing_user(monkeypatch, tmp_path) -> None:
+    db_path = tmp_path / "service_tests_missing_user.db"
+    engine = create_engine(f"sqlite:///{db_path.as_posix()}", connect_args={"check_same_thread": False})
+    Base.metadata.create_all(bind=engine)
+    SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False, class_=Session)
+    db = SessionLocal()
+    user_id = "56ad5e31-525e-4fe3-9415-7c31ec1f5874"
+
+    fake_client = _FakeLLMClient({"generate_identity_models": _identity_models_payload("Batch1")})
+    monkeypatch.setattr(identity_service, "get_llm_client", lambda: fake_client)
+
+    models = identity_service.generate_identity_models(
+        db=db,
+        user_id=user_id,
+        session_id=None,
+        capability_profile={"skill_stack": ["python"]},
+        count=3,
+    )
+    created_user = db.query(User).filter(User.id == user_id).first()
+
+    assert len(models) == 3
+    assert created_user is not None
     _close_db(db)
 
 

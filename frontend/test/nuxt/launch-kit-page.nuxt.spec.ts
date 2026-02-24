@@ -59,6 +59,12 @@ const createFlowState = (): MvpFlowState => ({
   selectedPrimaryId: primaryModel.id,
   persona,
   draftToCheck: '',
+  contentMatrixes: [],
+  experiments: [],
+  monetizationMaps: [],
+  identityPortfolios: [],
+  simulatorEvaluations: [],
+  viewpointAssets: [],
   events: [],
 })
 

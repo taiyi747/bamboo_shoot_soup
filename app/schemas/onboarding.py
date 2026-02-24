@@ -30,6 +30,7 @@ class OnboardingSessionResponse(BaseModel):
     user_id: str
     status: str
     questionnaire_responses: str
+    questionnaire: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime
     completed_at: datetime | None = None
 
@@ -54,9 +55,12 @@ class CapabilityProfileResponse(BaseModel):
     session_id: str
     user_id: str
     skill_stack_json: str
+    skill_stack: list[str] = Field(default_factory=list)
     interest_energy_curve_json: str
+    interest_energy_curve: list[dict[str, Any]] = Field(default_factory=list)
     cognitive_style: str
     value_boundaries_json: str
+    value_boundaries: list[str] = Field(default_factory=list)
     risk_tolerance: int
     time_investment_hours: int
     created_at: datetime

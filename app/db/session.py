@@ -3,6 +3,7 @@
 from collections.abc import Generator
 from pathlib import Path
 
+from sqlalchemy import event
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
@@ -43,6 +44,14 @@ engine = create_engine(
     pool_pre_ping=True,
     connect_args=_connect_args(settings.database_url),
 )
+
+
+if make_url(settings.database_url).drivername.startswith("sqlite"):
+    @event.listens_for(engine, "connect")
+    def _set_sqlite_pragma(dbapi_connection, _connection_record) -> None:
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 SessionLocal = sessionmaker(
     autocommit=False,

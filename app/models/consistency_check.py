@@ -7,6 +7,7 @@ from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.utils.json_fields import parse_json_array, parse_json_object
 
 
 def _new_id() -> str:
@@ -46,6 +47,18 @@ class ConsistencyCheck(Base):
         default=lambda: datetime.now(timezone.utc),
     )
 
+    @property
+    def deviation_items(self) -> list[str]:
+        return [str(item) for item in parse_json_array(self.deviation_items_json)]
+
+    @property
+    def deviation_reasons(self) -> list[str]:
+        return [str(item) for item in parse_json_array(self.deviation_reasons_json)]
+
+    @property
+    def suggestions(self) -> list[str]:
+        return [str(item) for item in parse_json_array(self.suggestions_json)]
+
 
 class EventLog(Base):
     """关键事件日志（埋点）。"""
@@ -65,3 +78,7 @@ class EventLog(Base):
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
     )
+
+    @property
+    def payload(self) -> dict:
+        return parse_json_object(self.payload_json)

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.models.persona import PersonaConstitution, RiskBoundaryItem
 from app.services.llm_client import get_llm_client, llm_schema_error
+from app.services.llm_observability import generate_json_with_observability
 
 
 class _PersonaConstitutionOutput(BaseModel):
@@ -102,10 +103,13 @@ def generate_constitution(
         "hint_forbidden_words": forbidden_words or [],
     }
     # 先调用 LLM，再做严格解析，最后才落库。
-    response_payload = get_llm_client().generate_json(
+    response_payload = generate_json_with_observability(
+        db=db,
+        user_id=user_id,
         operation="generate_constitution",
         system_prompt=PERSONA_CONSTITUTION_PROMPT,
         user_payload=llm_payload,
+        llm_client_getter=get_llm_client,
     )
     output = _parse_constitution(response_payload)
 

@@ -23,14 +23,20 @@ class IdentityModelResponse(BaseModel):
     title: str
     target_audience_pain: str
     content_pillars_json: str
+    content_pillars: list[str] = Field(default_factory=list)
     tone_keywords_json: str
+    tone_keywords: list[str] = Field(default_factory=list)
     tone_examples_json: str
+    tone_examples: list[str] = Field(default_factory=list)
     long_term_views_json: str
+    long_term_views: list[str] = Field(default_factory=list)
     differentiation: str
     growth_path_0_3m: str
     growth_path_3_12m: str
     monetization_validation_order_json: str
+    monetization_validation_order: list[str] = Field(default_factory=list)
     risk_boundary_json: str
+    risk_boundary: list[str] = Field(default_factory=list)
     is_primary: bool
     is_backup: bool
     created_at: datetime

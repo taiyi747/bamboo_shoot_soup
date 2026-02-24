@@ -7,6 +7,7 @@ from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.utils.json_fields import parse_json_array
 
 
 def _new_id() -> str:
@@ -48,6 +49,22 @@ class PersonaConstitution(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
+
+    @property
+    def common_words(self) -> list[str]:
+        return [str(item) for item in parse_json_array(self.common_words_json)]
+
+    @property
+    def forbidden_words(self) -> list[str]:
+        return [str(item) for item in parse_json_array(self.forbidden_words_json)]
+
+    @property
+    def sentence_preferences(self) -> list[str]:
+        return [str(item) for item in parse_json_array(self.sentence_preferences_json)]
+
+    @property
+    def moat_positions(self) -> list[str]:
+        return [str(item) for item in parse_json_array(self.moat_positions_json)]
 
 
 class RiskBoundaryItem(Base):

@@ -6,10 +6,14 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.models.onboarding import OnboardingSession, CapabilityProfile
+from app.services.user import ensure_user_exists
 
 
 def create_session(db: Session, user_id: str) -> OnboardingSession:
     """Create a new onboarding session."""
+    # Foreign key hardening requires an existing user row.
+    ensure_user_exists(db, user_id)
+
     # 会话创建时仅记录基础状态，问卷内容在完成阶段回填。
     session = OnboardingSession(
         user_id=user_id,

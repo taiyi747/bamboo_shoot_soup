@@ -8,11 +8,19 @@ from typing import Any
 from pydantic import BaseModel, ValidationError, model_validator
 from sqlalchemy.orm import Session
 
+from app.models.content_matrix import ContentMatrix, ContentTopic
 from app.models.consistency_check import ConsistencyCheck
+from app.models.growth_experiment import GrowthExperiment
 from app.models.identity_model import IdentityModel, IdentitySelection
+from app.models.identity_portfolio import IdentityPortfolio
 from app.models.launch_kit import LaunchKit
+from app.models.monetization import MonetizationMap
 from app.models.persona import PersonaConstitution, RiskBoundaryItem
+from app.models.simulator import PrepublishEvaluation
+from app.models.viewpoint_asset import ViewpointAsset
 from app.services.llm_client import get_llm_client, llm_schema_error
+from app.services.llm_observability import generate_json_with_observability
+from app.services.user import ensure_user_exists
 
 
 class _IdentityCandidate(BaseModel):
@@ -115,9 +123,11 @@ def _replace_user_identity_models(db: Session, user_id: str) -> None:
     if not existing_model_ids:
         return
 
-    db.query(IdentitySelection).filter(IdentitySelection.user_id == user_id).delete(
-        synchronize_session=False
-    )
+    db.query(IdentitySelection).filter(
+        (IdentitySelection.user_id == user_id)
+        | (IdentitySelection.primary_identity_id.in_(existing_model_ids))
+        | (IdentitySelection.backup_identity_id.in_(existing_model_ids))
+    ).delete(synchronize_session=False)
 
     db.query(PersonaConstitution).filter(
         PersonaConstitution.identity_model_id.in_(existing_model_ids)
@@ -141,6 +151,47 @@ def _replace_user_identity_models(db: Session, user_id: str) -> None:
         {ConsistencyCheck.identity_model_id: None},
         synchronize_session=False,
     )
+
+    db.query(ContentMatrix).filter(ContentMatrix.identity_model_id.in_(existing_model_ids)).update(
+        {ContentMatrix.identity_model_id: None},
+        synchronize_session=False,
+    )
+
+    db.query(ContentTopic).filter(ContentTopic.identity_model_id.in_(existing_model_ids)).update(
+        {ContentTopic.identity_model_id: None},
+        synchronize_session=False,
+    )
+
+    db.query(GrowthExperiment).filter(
+        GrowthExperiment.identity_model_id.in_(existing_model_ids)
+    ).update(
+        {GrowthExperiment.identity_model_id: None},
+        synchronize_session=False,
+    )
+
+    db.query(MonetizationMap).filter(
+        MonetizationMap.identity_model_id.in_(existing_model_ids)
+    ).update(
+        {MonetizationMap.identity_model_id: None},
+        synchronize_session=False,
+    )
+
+    db.query(PrepublishEvaluation).filter(
+        PrepublishEvaluation.identity_model_id.in_(existing_model_ids)
+    ).update(
+        {PrepublishEvaluation.identity_model_id: None},
+        synchronize_session=False,
+    )
+
+    db.query(ViewpointAsset).filter(ViewpointAsset.identity_model_id.in_(existing_model_ids)).update(
+        {ViewpointAsset.identity_model_id: None},
+        synchronize_session=False,
+    )
+
+    db.query(IdentityPortfolio).filter(
+        (IdentityPortfolio.primary_identity_id.in_(existing_model_ids))
+        | (IdentityPortfolio.backup_identity_id.in_(existing_model_ids))
+    ).delete(synchronize_session=False)
 
     db.query(IdentityModel).filter(IdentityModel.id.in_(existing_model_ids)).delete(
         synchronize_session=False
@@ -177,12 +228,16 @@ def generate_identity_models(
         "count": count,
         "capability_profile": capability_profile,
     }
+    ensure_user_exists(db, user_id)
 
     # 第一步：向 LLM 请求严格 JSON 输出。
-    response_payload = get_llm_client().generate_json(
+    response_payload = generate_json_with_observability(
+        db=db,
+        user_id=user_id,
         operation="generate_identity_models",
         system_prompt=IDENTITY_MODELS_PROMPT,
         user_payload=llm_payload,
+        llm_client_getter=get_llm_client,
     )
     # 第二步：先做 schema/业务规则校验，再进入落库。
     candidates = _parse_identity_models(response_payload, count=count)

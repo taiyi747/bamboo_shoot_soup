@@ -228,12 +228,7 @@ MVP 最小交付：
 
 ## 13. 当前仓库状态
 
-当前仓库以产品与业务规格文档为主，尚处于实现前准备阶段。建议按以下顺序推进：
-
-1. 建立后端骨架（FastAPI + SQLAlchemy + Alembic + SQLite + 领域模型）
-2. 建立桌面端骨架（Tauri v2 + Nuxt 4 + bun）
-3. 打通 MVP 主流程（诊断 -> 身份生成 -> 启动包 -> 一致性检查）
-4. 接入指标埋点与验收看板
+当前仓库已完成 MVP 主流程实现（诊断 -> 身份生成 -> 启动包 -> 一致性检查），并具备前后端自动化测试与本地桌面运行能力。当前重点从 MVP 加固进入 V1/V2 能力扩展。
 
 ## 14. 协作与文档优先级
 
@@ -244,3 +239,11 @@ MVP 最小交付：
 3. `docs/PRD.md`（背景与方向说明）
 
 若存在冲突：业务语义以 `docs/product-spec.md` 为准；执行流程与交付格式以 `AGENTS.md` 为准。
+
+## 15. 测试命令
+
+- 后端：`pytest -q`
+- 前端：`cd frontend && bun run test`
+- 一键验收：
+  - Windows：`pwsh scripts/acceptance.ps1`
+  - Unix-like：`bash scripts/acceptance.sh`

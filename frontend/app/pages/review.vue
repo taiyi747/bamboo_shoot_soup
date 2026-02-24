@@ -19,12 +19,15 @@ const exportJson = async () => {
   }
 
   const payload: DeliveryPackagePayload = {
+    schema_version: '1.1.0',
     profile: state.value.profile,
     primaryIdentity: selectedPrimaryModel.value,
     backupIdentity: selectedBackupModel.value,
     constitution: state.value.persona,
     launchKit: state.value.launchKit,
     consistencyCheck: state.value.consistencyCheck,
+    contentMatrixes: state.value.contentMatrixes,
+    monetizationMaps: state.value.monetizationMaps,
     events: state.value.events,
   }
 

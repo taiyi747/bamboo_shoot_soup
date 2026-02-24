@@ -12,3 +12,16 @@ def create_user(db: Session) -> User:
     db.commit()
     db.refresh(user)
     return user
+
+
+def ensure_user_exists(db: Session, user_id: str) -> User:
+    """Ensure a user row exists for a provided ID."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if user:
+        return user
+
+    user = User(id=user_id)
+    db.add(user)
+    # Do not commit here; caller controls transaction boundary.
+    db.flush()
+    return user

@@ -3,20 +3,25 @@ import { save } from '@tauri-apps/plugin-dialog'
 import { writeTextFile } from '@tauri-apps/plugin-fs'
 import type {
   AnalyticsEventPayload,
+  ContentMatrix,
   ConsistencyCheckResult,
   IdentityModelCard,
+  MonetizationMap,
   LaunchKit,
   OnboardingProfile,
   PersonaConstitution,
 } from '../../types/flow'
 
 export interface DeliveryPackagePayload {
+  schema_version?: string
   profile?: OnboardingProfile
   primaryIdentity?: IdentityModelCard
   backupIdentity?: IdentityModelCard
   constitution?: PersonaConstitution
   launchKit?: LaunchKit
   consistencyCheck?: ConsistencyCheckResult
+  contentMatrixes?: ContentMatrix[]
+  monetizationMaps?: MonetizationMap[]
   events: AnalyticsEventPayload[]
 }
 
@@ -50,7 +55,14 @@ export const createDeliveryJsonFileName = (timestamp: number = Date.now()): stri
   `bss-identity-review-${timestamp}.json`
 
 export const serializeDeliveryPackage = (payload: DeliveryPackagePayload): string =>
-  JSON.stringify(payload, null, 2)
+  JSON.stringify(
+    {
+      schema_version: payload.schema_version ?? '1.1.0',
+      ...payload,
+    },
+    null,
+    2
+  )
 
 const createDefaultBrowserAdapter = (): BrowserDownloadAdapter => ({
   createBlobUrl(blob) {

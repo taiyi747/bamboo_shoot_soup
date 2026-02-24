@@ -1,5 +1,6 @@
 """Onboarding 模型：问卷会话与能力画像。"""
 
+import json
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -7,6 +8,7 @@ from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.utils.json_fields import parse_json_array, parse_json_object
 
 
 def _new_id() -> str:
@@ -36,6 +38,10 @@ class OnboardingSession(Base):
         back_populates="session",
         uselist=False,
     )
+
+    @property
+    def questionnaire(self) -> dict:
+        return parse_json_object(self.questionnaire_responses)
 
 
 class CapabilityProfile(Base):
@@ -70,3 +76,16 @@ class CapabilityProfile(Base):
         "OnboardingSession",
         back_populates="capability_profile",
     )
+
+    @property
+    def skill_stack(self) -> list[str]:
+        return [str(item) for item in parse_json_array(self.skill_stack_json)]
+
+    @property
+    def interest_energy_curve(self) -> list[dict]:
+        items = parse_json_array(self.interest_energy_curve_json)
+        return [item for item in items if isinstance(item, dict)]
+
+    @property
+    def value_boundaries(self) -> list[str]:
+        return [str(item) for item in parse_json_array(self.value_boundaries_json)]

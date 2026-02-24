@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.models.launch_kit import LaunchKit, LaunchKitDay
 from app.services.llm_client import LLMServiceError, get_llm_client, llm_schema_error
+from app.services.llm_observability import generate_json_with_observability
 
 logger = logging.getLogger(__name__)
 
@@ -153,12 +154,19 @@ def _validation_error_brief(error_message: str) -> str:
     return first_line[:200]
 
 
-def _generate_launch_kit_output(*, llm_payload: dict[str, Any]) -> _LaunchKitOutput:
-    llm_client = get_llm_client()
-    response_payload = llm_client.generate_json(
+def _generate_launch_kit_output(
+    *,
+    db: Session,
+    user_id: str,
+    llm_payload: dict[str, Any],
+) -> _LaunchKitOutput:
+    response_payload = generate_json_with_observability(
+        db=db,
+        user_id=user_id,
         operation="generate_launch_kit",
         system_prompt=LAUNCH_KIT_PROMPT,
         user_payload=llm_payload,
+        llm_client_getter=get_llm_client,
     )
 
     try:
@@ -181,10 +189,13 @@ def _generate_launch_kit_output(*, llm_payload: dict[str, Any]) -> _LaunchKitOut
             "previous_invalid_response": last_payload,
             "validation_error": last_error.message,
         }
-        repaired_payload = llm_client.generate_json(
+        repaired_payload = generate_json_with_observability(
+            db=db,
+            user_id=user_id,
             operation="generate_launch_kit",
             system_prompt=LAUNCH_KIT_REPAIR_PROMPT,
             user_payload=repair_payload,
+            llm_client_getter=get_llm_client,
         )
         try:
             return _parse_launch_kit(repaired_payload)
@@ -228,7 +239,11 @@ def generate_launch_kit(
         "hint_sustainable_columns": sustainable_columns or [],
         "hint_growth_experiment_suggestion": growth_experiment_suggestion or [],
     }
-    output = _generate_launch_kit_output(llm_payload=llm_payload)
+    output = _generate_launch_kit_output(
+        db=db,
+        user_id=user_id,
+        llm_payload=llm_payload,
+    )
 
     # 第三步：先写入启动包主记录，再写入每日明细。
     kit = LaunchKit(

@@ -58,6 +58,15 @@ def test_create_session_validation_error_returns_422(client: TestClient) -> None
     assert response.status_code == 422
 
 
+def test_create_session_auto_creates_missing_user(client: TestClient) -> None:
+    unknown_user_id = "9d3d6c6c-4d65-4ed3-9556-c8f821f0d1bd"
+    response = client.post("/v1/onboarding/sessions", json={"user_id": unknown_user_id})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["user_id"] == unknown_user_id
+    assert body["status"] == "in_progress"
+
+
 def test_complete_session_validation_error_returns_422(client: TestClient, user_id: str) -> None:
     create_response = client.post("/v1/onboarding/sessions", json={"user_id": user_id})
     session_id = create_response.json()["id"]

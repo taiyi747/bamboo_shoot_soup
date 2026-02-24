@@ -74,6 +74,81 @@ export interface LaunchKit {
   growthExperiment: GrowthExperiment
 }
 
+export interface ContentTopic {
+  id: string
+  title: string
+  angle: string
+  platform: string
+  format: string
+  status: string
+}
+
+export interface ContentMatrix {
+  id: string
+  pillar: string
+  platform: string
+  format: string
+  status: string
+  topics: ContentTopic[]
+}
+
+export interface GrowthExperimentRecord {
+  id: string
+  hypothesis: string
+  variables: string[]
+  duration: string
+  result: string
+  conclusion: string
+  nextIteration: string
+  status: string
+}
+
+export interface MonetizationWeekNode {
+  weekNo: number
+  objective: string
+  expectedOutput: string
+  validationGoal: string
+  status: string
+}
+
+export interface MonetizationMap {
+  id: string
+  title: string
+  status: string
+  weeks: MonetizationWeekNode[]
+}
+
+export interface IdentityPortfolio {
+  id: string
+  primaryIdentityId: string
+  backupIdentityId?: string
+  anonymousIdentity: string
+  toolIdentity: string
+  conflictAvoidance: string
+  assetReuseStrategy: string
+}
+
+export interface PrepublishEvaluation {
+  id: string
+  growthPredictionRange: string
+  controversyProb: number
+  brandRisk: number
+  trustImpact: number
+  recommendation: string
+  triggerFactors: string[]
+  rewrite: string
+  manualConfirmationRequired: boolean
+}
+
+export interface ViewpointAsset {
+  id: string
+  topic: string
+  platform: string
+  stance: string
+  summary: string
+  tags: string[]
+}
+
 export interface ConsistencyCheckResult {
   deviations: string[]
   reasons: string[]
@@ -113,5 +188,11 @@ export interface MvpFlowState {
   launchKit?: LaunchKit
   draftToCheck: string
   consistencyCheck?: ConsistencyCheckResult
+  contentMatrixes: ContentMatrix[]
+  experiments: GrowthExperimentRecord[]
+  monetizationMaps: MonetizationMap[]
+  identityPortfolios: IdentityPortfolio[]
+  simulatorEvaluations: PrepublishEvaluation[]
+  viewpointAssets: ViewpointAsset[]
   events: AnalyticsEventPayload[]
 }

@@ -35,6 +35,12 @@ const createFlowState = (): MvpFlowState => ({
   identityModels: [primaryModel],
   selectedPrimaryId: primaryModel.id,
   draftToCheck: '',
+  contentMatrixes: [],
+  experiments: [],
+  monetizationMaps: [],
+  identityPortfolios: [],
+  simulatorEvaluations: [],
+  viewpointAssets: [],
   events: [],
 })
 

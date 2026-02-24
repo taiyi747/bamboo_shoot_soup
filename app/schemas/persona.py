@@ -20,9 +20,13 @@ class PersonaConstitutionResponse(BaseModel):
     user_id: str
     identity_model_id: str | None = None
     common_words_json: str
+    common_words: list[str] = Field(default_factory=list)
     forbidden_words_json: str
+    forbidden_words: list[str] = Field(default_factory=list)
     sentence_preferences_json: str
+    sentence_preferences: list[str] = Field(default_factory=list)
     moat_positions_json: str
+    moat_positions: list[str] = Field(default_factory=list)
     narrative_mainline: str
     growth_arc_template: str
     version: int

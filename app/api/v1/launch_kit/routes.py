@@ -54,6 +54,9 @@ def generate_launch_kit(
             }
             for d in kit.days
         ],
+        "degraded": False,
+        "degrade_reason": None,
+        "schema_repair_attempts": 0,
     }
 
 

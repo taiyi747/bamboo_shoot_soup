@@ -5,9 +5,12 @@ type Dict = Record<string, unknown>
 
 interface OnboardingProfileDto {
   skill_stack_json: unknown
+  skill_stack?: unknown
   interest_energy_curve_json: unknown
+  interest_energy_curve?: unknown
   cognitive_style: string
   value_boundaries_json: unknown
+  value_boundaries?: unknown
   risk_tolerance: number
   time_investment_hours: number
 }
@@ -17,21 +20,31 @@ interface IdentityModelDto {
   title: string
   target_audience_pain: string
   content_pillars_json: unknown
+  content_pillars?: unknown
   tone_keywords_json: unknown
+  tone_keywords?: unknown
   tone_examples_json: unknown
+  tone_examples?: unknown
   long_term_views_json: unknown
+  long_term_views?: unknown
   differentiation: string
   growth_path_0_3m: string
   growth_path_3_12m: string
   monetization_validation_order_json: unknown
+  monetization_validation_order?: unknown
   risk_boundary_json: unknown
+  risk_boundary?: unknown
 }
 
 interface PersonaConstitutionDto {
   common_words_json: unknown
+  common_words?: unknown
   forbidden_words_json: unknown
+  forbidden_words?: unknown
   sentence_preferences_json: unknown
+  sentence_preferences?: unknown
   moat_positions_json: unknown
+  moat_positions?: unknown
   narrative_mainline: string
   growth_arc_template: string
 }
@@ -46,7 +59,9 @@ interface LaunchKitDayDto {
 interface LaunchKitDto {
   days: LaunchKitDayDto[]
   sustainable_columns_json: unknown
+  sustainable_columns?: unknown
   growth_experiment_suggestion_json: unknown
+  growth_experiment_suggestion?: unknown
 }
 
 const toErrorMessage = (data: unknown): string => {
@@ -273,25 +288,27 @@ const requestJson = async <T>(
 }
 
 const mapProfile = (dto: OnboardingProfileDto): OnboardingProfile => ({
-  skillStack: toStringArray(dto.skill_stack_json),
-  energyCurve: parseEnergyCurve(dto.interest_energy_curve_json),
+  skillStack: toStringArray(dto.skill_stack ?? dto.skill_stack_json),
+  energyCurve: parseEnergyCurve(dto.interest_energy_curve ?? dto.interest_energy_curve_json),
   cognitiveStyle: dto.cognitive_style || '',
-  valueBoundaries: toStringArray(dto.value_boundaries_json),
+  valueBoundaries: toStringArray(dto.value_boundaries ?? dto.value_boundaries_json),
   riskTolerance: numberToRiskTolerance(dto.risk_tolerance ?? 3),
   weeklyHours: Number(dto.time_investment_hours || 0),
   recommendedPlatforms: ['小红书', '公众号', '视频号'],
 })
 
 const mapIdentityModel = (dto: IdentityModelDto): IdentityModelCard => {
-  const monetizationValidationOrder = toStringArray(dto.monetization_validation_order_json)
+  const monetizationValidationOrder = toStringArray(
+    dto.monetization_validation_order ?? dto.monetization_validation_order_json
+  )
   return {
     id: dto.id,
     title: dto.title || '未命名身份',
     targetAudiencePain: dto.target_audience_pain || '',
-    contentPillars: toStringArray(dto.content_pillars_json),
-    toneStyleKeywords: toStringArray(dto.tone_keywords_json),
-    toneExamples: parseToneExamples(dto.tone_examples_json),
-    longTermViews: toStringArray(dto.long_term_views_json),
+    contentPillars: toStringArray(dto.content_pillars ?? dto.content_pillars_json),
+    toneStyleKeywords: toStringArray(dto.tone_keywords ?? dto.tone_keywords_json),
+    toneExamples: parseToneExamples(dto.tone_examples ?? dto.tone_examples_json),
+    longTermViews: toStringArray(dto.long_term_views ?? dto.long_term_views_json),
     differentiation: dto.differentiation || '',
     growthPath: {
       firstQuarter: dto.growth_path_0_3m || '',
@@ -299,21 +316,23 @@ const mapIdentityModel = (dto: IdentityModelDto): IdentityModelCard => {
     },
     monetizationValidationOrder,
     monetizationMap: monetizationValidationOrder.join(' -> '),
-    riskBoundaries: toStringArray(dto.risk_boundary_json),
+    riskBoundaries: toStringArray(dto.risk_boundary ?? dto.risk_boundary_json),
   }
 }
 
 const mapPersona = (dto: PersonaConstitutionDto): PersonaConstitution => ({
-  commonWords: toStringArray(dto.common_words_json),
-  forbiddenWords: toStringArray(dto.forbidden_words_json),
-  sentencePreferences: toStringArray(dto.sentence_preferences_json),
-  immutablePositions: toStringArray(dto.moat_positions_json),
+  commonWords: toStringArray(dto.common_words ?? dto.common_words_json),
+  forbiddenWords: toStringArray(dto.forbidden_words ?? dto.forbidden_words_json),
+  sentencePreferences: toStringArray(dto.sentence_preferences ?? dto.sentence_preferences_json),
+  immutablePositions: toStringArray(dto.moat_positions ?? dto.moat_positions_json),
   narrativeMainline: dto.narrative_mainline || '',
   growthArc: parseGrowthArc(dto.growth_arc_template || ''),
 })
 
 const mapLaunchKit = (dto: LaunchKitDto): LaunchKit => {
-  const growthExperiments = parseJsonArray(dto.growth_experiment_suggestion_json)
+  const growthExperiments = parseJsonArray(
+    dto.growth_experiment_suggestion ?? dto.growth_experiment_suggestion_json
+  )
   const growthExperiment = growthExperiments[0] && typeof growthExperiments[0] === 'object' ? (growthExperiments[0] as Dict) : {}
   const variables = Array.isArray(growthExperiment.variables)
     ? growthExperiment.variables.filter(item => typeof item === 'string').map(item => String(item))
@@ -326,7 +345,7 @@ const mapLaunchKit = (dto: LaunchKitDto): LaunchKit => {
       draftOutline: day.draft_or_outline || '',
       opening: day.opening_text || '',
     })),
-    sustainableColumns: toStringArray(dto.sustainable_columns_json),
+    sustainableColumns: toStringArray(dto.sustainable_columns ?? dto.sustainable_columns_json),
     growthExperiment: {
       hypothesis: String(growthExperiment.hypothesis || ''),
       variables,

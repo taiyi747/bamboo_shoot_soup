@@ -42,6 +42,9 @@ def generate_constitution(
         "user_id": constitution.user_id,
         "version": constitution.version,
         "narrative_mainline": constitution.narrative_mainline,
+        "degraded": False,
+        "degrade_reason": None,
+        "schema_repair_attempts": 0,
     }
 
 

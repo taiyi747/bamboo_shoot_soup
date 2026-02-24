@@ -7,6 +7,7 @@ from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.utils.json_fields import parse_json_array
 
 
 def _new_id() -> str:
@@ -43,6 +44,15 @@ class LaunchKit(Base):
         back_populates="kit",
         order_by="LaunchKitDay.day_no",
     )
+
+    @property
+    def sustainable_columns(self) -> list[str]:
+        return [str(item) for item in parse_json_array(self.sustainable_columns_json)]
+
+    @property
+    def growth_experiment_suggestion(self) -> list[dict]:
+        items = parse_json_array(self.growth_experiment_suggestion_json)
+        return [item for item in items if isinstance(item, dict)]
 
 
 class LaunchKitDay(Base):

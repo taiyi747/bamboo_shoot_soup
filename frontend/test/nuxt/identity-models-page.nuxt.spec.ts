@@ -58,6 +58,12 @@ const createFlowState = (): MvpFlowState => ({
   selectedPrimaryId: undefined,
   selectedBackupId: undefined,
   draftToCheck: '',
+  contentMatrixes: [],
+  experiments: [],
+  monetizationMaps: [],
+  identityPortfolios: [],
+  simulatorEvaluations: [],
+  viewpointAssets: [],
   events: [],
 })
 

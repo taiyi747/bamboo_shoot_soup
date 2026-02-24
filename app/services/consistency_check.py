@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.models.consistency_check import ConsistencyCheck
 from app.services.llm_client import LLMServiceError, get_llm_client, llm_schema_error
+from app.services.llm_observability import generate_json_with_observability
 
 logger = logging.getLogger(__name__)
 
@@ -128,13 +129,17 @@ def _build_degraded_output() -> _ConsistencyCheckOutput:
 
 def _generate_consistency_output(
     *,
+    db: Session,
+    user_id: str,
     llm_payload: dict[str, Any],
 ) -> tuple[_ConsistencyCheckOutput, bool, str | None, int]:
-    llm_client = get_llm_client()
-    response_payload = llm_client.generate_json(
+    response_payload = generate_json_with_observability(
+        db=db,
+        user_id=user_id,
         operation="check_consistency",
         system_prompt=CONSISTENCY_CHECK_PROMPT,
         user_payload=llm_payload,
+        llm_client_getter=get_llm_client,
     )
 
     try:
@@ -158,10 +163,13 @@ def _generate_consistency_output(
             "previous_invalid_response": last_payload,
             "validation_error": last_error.message,
         }
-        repaired_payload = llm_client.generate_json(
+        repaired_payload = generate_json_with_observability(
+            db=db,
+            user_id=user_id,
             operation="check_consistency",
             system_prompt=CONSISTENCY_CHECK_REPAIR_PROMPT,
             user_payload=repair_payload,
+            llm_client_getter=get_llm_client,
         )
         try:
             output = _parse_consistency_output(repaired_payload)
@@ -207,6 +215,8 @@ def check_consistency(
         "draft_text": draft_text,
     }
     output, degraded, degrade_reason, schema_repair_attempts = _generate_consistency_output(
+        db=db,
+        user_id=user_id,
         llm_payload=llm_payload
     )
 

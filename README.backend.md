@@ -49,5 +49,5 @@ alembic downgrade base
 ## Tests
 
 ```bash
-pytest
+pytest -q
 ```

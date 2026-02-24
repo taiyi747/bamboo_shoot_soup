@@ -21,6 +21,12 @@ const createFlowState = (): MvpFlowState => ({
   },
   identityModels: [],
   draftToCheck: '',
+  contentMatrixes: [],
+  experiments: [],
+  monetizationMaps: [],
+  identityPortfolios: [],
+  simulatorEvaluations: [],
+  viewpointAssets: [],
   events: [],
 })
 
