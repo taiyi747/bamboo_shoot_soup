@@ -1,11 +1,71 @@
-"""Persona constitution service."""
+"""人格宪法服务。"""
+
+from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from typing import Any
 
+from pydantic import BaseModel, ValidationError, model_validator
 from sqlalchemy.orm import Session
 
 from app.models.persona import PersonaConstitution, RiskBoundaryItem
+from app.services.llm_client import get_llm_client, llm_schema_error
+
+
+class _PersonaConstitutionOutput(BaseModel):
+    """LLM 人格宪法输出结构。"""
+
+    common_words: list[str]
+    forbidden_words: list[str]
+    sentence_preferences: list[str]
+    moat_positions: list[str]
+    narrative_mainline: str
+    growth_arc_template: str
+
+    @model_validator(mode="after")
+    def validate_business_rules(self) -> "_PersonaConstitutionOutput":
+        if len(self.common_words) < 3:
+            raise ValueError("common_words must contain at least 3 items")
+        if len(self.forbidden_words) < 3:
+            raise ValueError("forbidden_words must contain at least 3 items")
+        if len(self.sentence_preferences) < 3:
+            raise ValueError("sentence_preferences must contain at least 3 items")
+        if len(self.moat_positions) < 3:
+            raise ValueError("moat_positions must contain at least 3 items")
+        if not self.narrative_mainline.strip():
+            raise ValueError("narrative_mainline must be non-empty")
+        if not self.growth_arc_template.strip():
+            raise ValueError("growth_arc_template must be non-empty")
+        return self
+
+
+PERSONA_CONSTITUTION_PROMPT = """
+You are generating a persona constitution JSON for a creator.
+Return strict JSON only with this shape:
+{
+  "common_words": ["string", "... at least 3 items"],
+  "forbidden_words": ["string", "... at least 3 items"],
+  "sentence_preferences": ["string", "... at least 3 items"],
+  "moat_positions": ["string", "... at least 3 items"],
+  "narrative_mainline": "string",
+  "growth_arc_template": "string"
+}
+Hard constraints:
+- no markdown
+- no extra keys
+- all string fields must be non-empty
+""".strip()
+
+
+def _parse_constitution(payload: dict[str, Any]) -> _PersonaConstitutionOutput:
+    """校验 LLM 响应并转换为强类型结构。"""
+    try:
+        return _PersonaConstitutionOutput.model_validate(payload)
+    except ValidationError as exc:
+        raise llm_schema_error(
+            "generate_constitution",
+            f"Persona constitution schema validation failed: {exc}",
+        ) from exc
 
 
 def generate_constitution(
@@ -16,56 +76,15 @@ def generate_constitution(
     forbidden_words: list[str] | None = None,
 ) -> PersonaConstitution:
     """
-    Generate persona constitution based on identity model.
-    
+    Generate persona constitution based on identity model via LLM.
+
     Per product-spec 2.3:
     - 口吻词典（常用词、禁用词、句式偏好）
     - 观点护城河（3条不可动摇立场）
     - 叙事主线（长期动机）
     - 成长Arc（阶段叙事模板）
     """
-    # Use provided words or generate defaults
-    common_words = common_words or ["我", "你", "我们", "其实", "真的"]
-    forbidden_words = forbidden_words or ["绝对", "一定", "必须", "保证", "没问题"]
-
-    # Sample sentence preferences
-    sentence_preferences = [
-        "用短句，保持简洁",
-        "多用具体案例，少讲道理",
-        "适当使用问句增加互动",
-        "避免说教语气",
-        "保持真诚，不装",
-    ]
-
-    # Sample moat positions (观点护城河)
-    moat_positions = [
-        "坚持长期主义，不追求短期爆红",
-        "内容必须有实际价值，拒绝水货",
-        "保持独立思考，不人云亦云",
-    ]
-
-    # Sample narrative mainline
-    narrative_mainline = "帮助职场人和创业者找到适合自己的成长路径，通过真实经验分享和实用方法论，让每个人都能建立可复用的个人品牌资产。"
-
-    # Sample growth arc
-    growth_arc = """
-    第一阶段（0-3个月）：建立认知，完成从0到1的内容尝试
-    - 确定内容方向和固定栏目
-    - 找到适合自己的表达方式
-    - 积累第一批粉丝
-    
-    第二阶段（3-6个月）：形成风格，建立个人品牌认知
-    - 固化内容风格和系列
-    - 尝试多平台分发
-    - 开始小规模变现尝试
-    
-    第三阶段（6-12个月）：扩大影响，探索变现路径
-    - 形成稳定的内容产出流水线
-    - 开发付费产品或服务
-    - 建立个人品牌资产
-    """
-
-    # Check for previous version
+    # 版本号基于该用户最近一次宪法递增。
     previous = (
         db.query(PersonaConstitution)
         .filter(PersonaConstitution.user_id == user_id)
@@ -75,19 +94,35 @@ def generate_constitution(
     previous_version_id = previous.id if previous else None
     new_version = (previous.version + 1) if previous else 1
 
+    llm_payload = {
+        "user_id": user_id,
+        "identity_model_id": identity_model_id,
+        # 可选词汇提示，由调用方传入用于引导输出风格。
+        "hint_common_words": common_words or [],
+        "hint_forbidden_words": forbidden_words or [],
+    }
+    # 先调用 LLM，再做严格解析，最后才落库。
+    response_payload = get_llm_client().generate_json(
+        operation="generate_constitution",
+        system_prompt=PERSONA_CONSTITUTION_PROMPT,
+        user_payload=llm_payload,
+    )
+    output = _parse_constitution(response_payload)
+
     constitution = PersonaConstitution(
         user_id=user_id,
         identity_model_id=identity_model_id,
-        common_words_json=json.dumps(common_words, ensure_ascii=False),
-        forbidden_words_json=json.dumps(forbidden_words, ensure_ascii=False),
-        sentence_preferences_json=json.dumps(sentence_preferences, ensure_ascii=False),
-        moat_positions_json=json.dumps(moat_positions, ensure_ascii=False),
-        narrative_mainline=narrative_mainline,
-        growth_arc_template=growth_arc,
+        common_words_json=json.dumps(output.common_words, ensure_ascii=False),
+        forbidden_words_json=json.dumps(output.forbidden_words, ensure_ascii=False),
+        sentence_preferences_json=json.dumps(output.sentence_preferences, ensure_ascii=False),
+        moat_positions_json=json.dumps(output.moat_positions, ensure_ascii=False),
+        narrative_mainline=output.narrative_mainline,
+        growth_arc_template=output.growth_arc_template,
         version=new_version,
         previous_version_id=previous_version_id,
     )
     db.add(constitution)
+    # 一次提交，保证内容与版本链同时生效。
     db.commit()
     db.refresh(constitution)
     return constitution

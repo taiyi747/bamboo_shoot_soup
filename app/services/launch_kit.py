@@ -1,11 +1,203 @@
-"""Launch kit service."""
+"""启动包服务。"""
+
+from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+import logging
+from typing import Any
 
+from pydantic import BaseModel, ValidationError, field_validator, model_validator
 from sqlalchemy.orm import Session
 
 from app.models.launch_kit import LaunchKit, LaunchKitDay
+from app.services.llm_client import LLMServiceError, get_llm_client, llm_schema_error
+
+logger = logging.getLogger(__name__)
+
+SCHEMA_REPAIR_MAX_RETRIES = 2
+
+
+class _LaunchKitDayOutput(BaseModel):
+    """启动包单日内容结构。"""
+
+    day_no: int
+    theme: str
+    draft_or_outline: str
+    opening_text: str
+
+    @field_validator("day_no")
+    @classmethod
+    def validate_day_no(cls, value: int) -> int:
+        if value < 1 or value > 7:
+            raise ValueError("day_no must be between 1 and 7")
+        return value
+
+    @model_validator(mode="after")
+    def validate_text(self) -> "_LaunchKitDayOutput":
+        if not self.theme.strip():
+            raise ValueError("theme must be non-empty")
+        if not self.draft_or_outline.strip():
+            raise ValueError("draft_or_outline must be non-empty")
+        if not self.opening_text.strip():
+            raise ValueError("opening_text must be non-empty")
+        return self
+
+
+class _LaunchKitOutput(BaseModel):
+    """启动包顶层结构。"""
+
+    sustainable_columns: list[str]
+    growth_experiment_suggestion: list[dict[str, Any]]
+    days: list[_LaunchKitDayOutput]
+
+    @model_validator(mode="after")
+    def validate_business_rules(self) -> "_LaunchKitOutput":
+        if len(self.sustainable_columns) < 3:
+            raise ValueError("sustainable_columns must contain at least 3 items")
+        if len(self.growth_experiment_suggestion) < 1:
+            raise ValueError("growth_experiment_suggestion must contain at least 1 item")
+        if len(self.days) != 7:
+            raise ValueError("days must contain exactly 7 entries")
+
+        day_numbers = sorted(day.day_no for day in self.days)
+        if day_numbers != [1, 2, 3, 4, 5, 6, 7]:
+            raise ValueError("days must contain unique day_no values 1..7")
+        return self
+
+
+LAUNCH_KIT_PROMPT = """
+You are generating a 7-day launch kit JSON for a creator.
+Return strict JSON only with this shape:
+{
+  "sustainable_columns": ["string", "... at least 3 items"],
+  "growth_experiment_suggestion": [
+    {
+      "name": "string",
+      "hypothesis": "string",
+      "variables": ["string", "..."],
+      "duration": "string",
+      "success_metric": "string"
+    }
+  ],
+  "days": [
+    {
+      "day_no": 1,
+      "theme": "string",
+      "draft_or_outline": "string",
+      "opening_text": "string"
+    }
+  ]
+}
+Hard constraints:
+- include exactly 7 days
+- day_no must be unique from 1 to 7
+- each day must include non-empty: day_no, theme, draft_or_outline, opening_text
+- no markdown
+- no extra keys
+- self-check before returning:
+  - verify days length == 7
+  - verify all day_no values are exactly 1..7 with no duplicates
+  - verify every day has draft_or_outline
+""".strip()
+
+LAUNCH_KIT_REPAIR_PROMPT = """
+You are repairing an invalid JSON object for a 7-day launch kit output.
+Return strict JSON only with this exact shape:
+{
+  "sustainable_columns": ["string", "... at least 3 items"],
+  "growth_experiment_suggestion": [
+    {
+      "name": "string",
+      "hypothesis": "string",
+      "variables": ["string", "..."],
+      "duration": "string",
+      "success_metric": "string"
+    }
+  ],
+  "days": [
+    {
+      "day_no": 1,
+      "theme": "string",
+      "draft_or_outline": "string",
+      "opening_text": "string"
+    }
+  ]
+}
+Hard constraints:
+- include exactly 7 days
+- day_no must be unique and cover 1..7
+- each day must include non-empty: day_no, theme, draft_or_outline, opening_text
+- sustainable_columns must have at least 3 items
+- growth_experiment_suggestion must have at least 1 item
+- no markdown
+- no extra keys
+""".strip()
+
+
+def _parse_launch_kit(payload: dict[str, Any]) -> _LaunchKitOutput:
+    """落库前对启动包响应进行结构化校验。"""
+    try:
+        return _LaunchKitOutput.model_validate(payload)
+    except ValidationError as exc:
+        raise llm_schema_error(
+            "generate_launch_kit",
+            f"Launch kit schema validation failed: {exc}",
+        ) from exc
+
+
+def _validation_error_brief(error_message: str) -> str:
+    first_line = error_message.splitlines()[0] if error_message else "unknown"
+    return first_line[:200]
+
+
+def _generate_launch_kit_output(*, llm_payload: dict[str, Any]) -> _LaunchKitOutput:
+    llm_client = get_llm_client()
+    response_payload = llm_client.generate_json(
+        operation="generate_launch_kit",
+        system_prompt=LAUNCH_KIT_PROMPT,
+        user_payload=llm_payload,
+    )
+
+    try:
+        return _parse_launch_kit(response_payload)
+    except LLMServiceError as exc:
+        if exc.code != "LLM_SCHEMA_VALIDATION_FAILED":
+            raise
+        last_error = exc
+
+    last_payload = response_payload
+    for attempt in range(1, SCHEMA_REPAIR_MAX_RETRIES + 1):
+        logger.warning(
+            "schema_retry operation=generate_launch_kit schema_retry_attempt=%s validation_error_brief=%s degraded=%s",
+            attempt,
+            _validation_error_brief(last_error.message),
+            False,
+        )
+        repair_payload = {
+            "original_user_payload": llm_payload,
+            "previous_invalid_response": last_payload,
+            "validation_error": last_error.message,
+        }
+        repaired_payload = llm_client.generate_json(
+            operation="generate_launch_kit",
+            system_prompt=LAUNCH_KIT_REPAIR_PROMPT,
+            user_payload=repair_payload,
+        )
+        try:
+            return _parse_launch_kit(repaired_payload)
+        except LLMServiceError as exc:
+            if exc.code != "LLM_SCHEMA_VALIDATION_FAILED":
+                raise
+            last_error = exc
+            last_payload = repaired_payload
+
+    raise llm_schema_error(
+        "generate_launch_kit",
+        (
+            "Launch kit schema validation failed after 2 schema repair retries. "
+            f"Last error: {_validation_error_brief(last_error.message)}"
+        ),
+    )
 
 
 def generate_launch_kit(
@@ -17,101 +209,51 @@ def generate_launch_kit(
     growth_experiment_suggestion: list[dict] | None = None,
 ) -> LaunchKit:
     """
-    Generate 7-Day Launch Kit.
-    
+    Generate 7-Day Launch Kit via LLM.
+
     Per product-spec 2.3:
-    - 7 日每日主题
+    - 7日每日主题
     - 每日内容草稿或大纲（含开头）
-    - 3 个可持续栏目
-    - 1 个增长实验
+    - 3个可持续栏目
+    - 1个增长实验建议
     """
-    # Default sustainable columns
-    sustainable_columns = sustainable_columns or [
-        "深度干货类",
-        "观点解读类",
-        "互动话题类",
-    ]
+    llm_payload = {
+        "user_id": user_id,
+        "identity_model_id": identity_model_id,
+        "constitution_id": constitution_id,
+        # 提示词是可选输入，不会绕过服务端严格校验。
+        "hint_sustainable_columns": sustainable_columns or [],
+        "hint_growth_experiment_suggestion": growth_experiment_suggestion or [],
+    }
+    output = _generate_launch_kit_output(llm_payload=llm_payload)
 
-    # Default growth experiment
-    growth_experiment_suggestion = growth_experiment_suggestion or [
-        {
-            "name": "发布时间测试",
-            "hypothesis": "不同发布时间对互动率有显著影响",
-            "variables": ["发布时间", "内容类型"],
-            "duration": "7天",
-            "success_metric": "互动率提升30%",
-        },
-    ]
-
-    # Create kit
+    # 第三步：先写入启动包主记录，再写入每日明细。
     kit = LaunchKit(
         user_id=user_id,
         identity_model_id=identity_model_id,
         constitution_id=constitution_id,
-        sustainable_columns_json=json.dumps(sustainable_columns, ensure_ascii=False),
+        sustainable_columns_json=json.dumps(output.sustainable_columns, ensure_ascii=False),
         growth_experiment_suggestion_json=json.dumps(
-            growth_experiment_suggestion, ensure_ascii=False
+            output.growth_experiment_suggestion,
+            ensure_ascii=False,
         ),
     )
     db.add(kit)
-    db.flush()  # Get kit.id
+    # flush 后可拿到 kit.id，供子表外键使用。
+    db.flush()
 
-    # Generate 7 days content
-    day_templates = [
-        {
-            "day_no": 1,
-            "theme": "自我介绍与价值主张",
-            "draft_or_outline": "开篇：我是谁，我能为你带来什么价值\n主体：为什么做这个方向\n结尾：希望和你一起成长",
-            "opening_text": "你好，我是...",
-        },
-        {
-            "day_no": 2,
-            "theme": "核心方法论分享",
-            "draft_or_outline": "开篇：一个常见痛点场景\n主体：3个关键步骤/要点\n结尾：总结要点+下期预告",
-            "opening_text": "很多人问我是怎么...",
-        },
-        {
-            "day_no": 3,
-            "theme": "案例拆解",
-            "draft_or_outline": "开篇：引入一个典型案例\n主体：案例背景、做法、结果\n结尾：从案例中提取的方法论",
-            "opening_text": "今天分享一个我最近的...",
-        },
-        {
-            "day_no": 4,
-            "theme": "观点与立场",
-            "draft_or_outline": "开篇：一个有争议的话题\n主体：我的观点及理由\n结尾：邀请读者评论",
-            "opening_text": "我不认为...",
-        },
-        {
-            "day_no": 5,
-            "theme": "工具与资源推荐",
-            "draft_or_outline": "开篇：介绍今天推荐的资源\n主体：资源特点、适用场景、使用方法\n结尾：获取方式+下期主题",
-            "opening_text": "最近发现了一个很实用的...",
-        },
-        {
-            "day_no": 6,
-            "theme": "互动问答/话题讨论",
-            "draft_or_outline": "开篇：提出一个讨论话题\n主体：我的看法+引导互动的问题\n结尾：下期预告",
-            "opening_text": "想听听你们的想法...",
-        },
-        {
-            "day_no": 7,
-            "theme": "一周回顾与下周预告",
-            "draft_or_outline": "开篇：本周内容回顾\n主体：本周收获总结\n结尾：下周内容预告+互动邀请",
-            "opening_text": "这周我们聊了...",
-        },
-    ]
-
-    for template in day_templates:
+    # 按 day_no 排序写入，保证读取顺序稳定。
+    for day_output in sorted(output.days, key=lambda day: day.day_no):
         day = LaunchKitDay(
             kit_id=kit.id,
-            day_no=template["day_no"],
-            theme=template["theme"],
-            draft_or_outline=template["draft_or_outline"],
-            opening_text=template["opening_text"],
+            day_no=day_output.day_no,
+            theme=day_output.theme,
+            draft_or_outline=day_output.draft_or_outline,
+            opening_text=day_output.opening_text,
         )
         db.add(day)
 
+    # 一次提交，保证主从记录事务一致。
     db.commit()
     db.refresh(kit)
     return kit

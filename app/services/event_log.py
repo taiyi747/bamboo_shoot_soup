@@ -1,4 +1,4 @@
-"""Event log service."""
+"""事件日志服务。"""
 
 import json
 from datetime import datetime, timezone
@@ -24,6 +24,7 @@ def log_event(
     - stage must be MVP/V1/V2
     - Each event includes user_id, timestamp, stage, identity_model_id
     """
+    # 事件名称白名单统一在服务层维护，避免多处口径漂移。
     valid_events = [
         "onboarding_started",
         "onboarding_completed",
@@ -43,6 +44,7 @@ def log_event(
     if stage not in ["MVP", "V1", "V2"]:
         raise ValueError(f"Invalid stage: {stage}. Must be MVP/V1/V2")
 
+    # payload 以 JSON 文本存储，便于后续字段扩展。
     payload = payload or {}
 
     event = EventLog(
@@ -54,6 +56,7 @@ def log_event(
         occurred_at=datetime.now(timezone.utc),
     )
     db.add(event)
+    # 事件日志立即提交，保证可观测性与审计时效。
     db.commit()
     db.refresh(event)
     return event

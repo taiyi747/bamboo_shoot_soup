@@ -1,4 +1,4 @@
-"""Launch kit schemas."""
+"""启动包相关 Schema。"""
 
 from datetime import datetime
 
@@ -10,7 +10,7 @@ class LaunchKitGenerate(BaseModel):
     user_id: str
     identity_model_id: str | None = None
     constitution_id: str | None = None
-    # Optional inputs
+    # 可选提示，不改变服务端输出结构校验规则。
     sustainable_columns: list[str] = Field(default_factory=list)
     growth_experiment_suggestion: list[dict[str, str]] = Field(default_factory=list)
 

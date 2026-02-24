@@ -1,4 +1,4 @@
-"""Onboarding schemas."""
+"""Onboarding 相关 Schema。"""
 
 from datetime import datetime
 from typing import Any
@@ -15,7 +15,7 @@ class OnboardingSessionComplete(BaseModel):
     """Complete onboarding with questionnaire responses."""
     session_id: str
     questionnaire_responses: dict[str, Any] = Field(default_factory=dict)
-    # Six dimensions from product-spec 2.5 MVP
+    # 六个核心诊断维度。
     skill_stack: list[str] = Field(default_factory=list)
     interest_energy_curve: list[dict[str, Any]] = Field(default_factory=list)
     cognitive_style: str = ""

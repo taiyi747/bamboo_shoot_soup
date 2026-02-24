@@ -1,4 +1,4 @@
-"""Consistency check schemas."""
+"""一致性检查相关 Schema。"""
 
 from datetime import datetime
 
@@ -11,7 +11,7 @@ class ConsistencyCheckCreate(BaseModel):
     identity_model_id: str | None = None
     constitution_id: str | None = None
     draft_text: str = ""
-    # Outputs (filled by system/service)
+    # 以下字段由服务端生成；请求方可忽略。
     deviation_items: list[str] = Field(default_factory=list)
     deviation_reasons: list[str] = Field(default_factory=list)
     suggestions: list[str] = Field(default_factory=list)
@@ -21,7 +21,7 @@ class ConsistencyCheckCreate(BaseModel):
     @field_validator("risk_warning")
     @classmethod
     def validate_risk_warning(cls, v, info):
-        # If risk_triggered is True, risk_warning must be provided
+        # 当请求显式声明 risk_triggered=True 时，要求携带 risk_warning。
         if info.data.get("risk_triggered") and not v:
             raise ValueError("risk_warning is required when risk_triggered is True")
         return v

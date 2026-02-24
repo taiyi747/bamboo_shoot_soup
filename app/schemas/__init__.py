@@ -1,4 +1,5 @@
-# Pydantic Schemas
+"""集中导出 Pydantic Schema，供路由与测试统一引用。"""
+
 from app.schemas.onboarding import (
     OnboardingSessionCreate,
     OnboardingSessionComplete,
@@ -31,6 +32,7 @@ from app.schemas.event_log import (
     EventLogCreate,
     EventLogResponse,
 )
+from app.schemas.user import UserResponse
 
 __all__ = [
     "OnboardingSessionCreate",
@@ -53,4 +55,5 @@ __all__ = [
     "ConsistencyCheckResponse",
     "EventLogCreate",
     "EventLogResponse",
+    "UserResponse",
 ]

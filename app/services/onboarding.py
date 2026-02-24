@@ -1,4 +1,4 @@
-"""Onboarding service."""
+"""Onboarding 诊断服务。"""
 
 import json
 from datetime import datetime, timezone
@@ -10,6 +10,7 @@ from app.models.onboarding import OnboardingSession, CapabilityProfile
 
 def create_session(db: Session, user_id: str) -> OnboardingSession:
     """Create a new onboarding session."""
+    # 会话创建时仅记录基础状态，问卷内容在完成阶段回填。
     session = OnboardingSession(
         user_id=user_id,
         status="in_progress",
@@ -33,17 +34,17 @@ def complete_session(
     time_investment_hours: int,
 ) -> tuple[OnboardingSession, CapabilityProfile]:
     """Complete onboarding session and create capability profile."""
-    # Get session
+    # 先定位并校验会话存在性。
     session = db.query(OnboardingSession).filter(OnboardingSession.id == session_id).first()
     if not session:
         raise ValueError(f"Session {session_id} not found")
 
-    # Update session
+    # 标记完成状态，并保存问卷快照。
     session.status = "completed"
     session.questionnaire_responses = json.dumps(questionnaire_responses, ensure_ascii=False)
     session.completed_at = datetime.now(timezone.utc)
 
-    # Create capability profile
+    # 根据六个关键维度生成能力画像。
     profile = CapabilityProfile(
         session_id=session_id,
         user_id=session.user_id,
@@ -55,6 +56,7 @@ def complete_session(
         time_investment_hours=time_investment_hours,
     )
     db.add(profile)
+    # 一次提交，保证会话状态与画像数据一致。
     db.commit()
     db.refresh(session)
     db.refresh(profile)

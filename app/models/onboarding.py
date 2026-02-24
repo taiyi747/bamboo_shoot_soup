@@ -1,27 +1,28 @@
-"""Onboarding models: session and capability profile."""
+"""Onboarding 模型：问卷会话与能力画像。"""
 
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, Integer
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
 
 def _new_id() -> str:
+    """生成 UUID 主键。"""
     return str(uuid4())
 
 
 class OnboardingSession(Base):
-    """Questionnaire session for identity diagnosis."""
+    """诊断问卷会话。"""
 
     __tablename__ = "onboarding_sessions"
 
     id: Mapped[str] = mapped_column(String(length=36), primary_key=True, default=_new_id)
     user_id: Mapped[str] = mapped_column(String(length=36), ForeignKey("users.id"), nullable=False)
-    status: Mapped[str] = mapped_column(String(20), default="in_progress")  # in_progress, completed
-    questionnaire_responses: Mapped[str] = mapped_column(Text, default="{}")  # JSON
+    status: Mapped[str] = mapped_column(String(20), default="in_progress")  # in_progress/completed
+    questionnaire_responses: Mapped[str] = mapped_column(Text, default="{}")  # JSON 文本
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -29,30 +30,35 @@ class OnboardingSession(Base):
     )
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    # Relationships
+    # 一对一能力画像（完成问卷后生成）。
     capability_profile: Mapped["CapabilityProfile | None"] = relationship(
-        "CapabilityProfile", back_populates="session", uselist=False
+        "CapabilityProfile",
+        back_populates="session",
+        uselist=False,
     )
 
 
 class CapabilityProfile(Base):
-    """User capability profile from diagnosis - six key dimensions."""
+    """能力画像：承载六个关键维度的结构化结果。"""
 
     __tablename__ = "capability_profiles"
 
     id: Mapped[str] = mapped_column(String(length=36), primary_key=True, default=_new_id)
     session_id: Mapped[str] = mapped_column(
-        String(length=36), ForeignKey("onboarding_sessions.id"), nullable=False, unique=True
+        String(length=36),
+        ForeignKey("onboarding_sessions.id"),
+        nullable=False,
+        unique=True,
     )
     user_id: Mapped[str] = mapped_column(String(length=36), ForeignKey("users.id"), nullable=False)
 
-    # Six key dimensions (product-spec 2.5 MVP)
-    skill_stack_json: Mapped[str] = mapped_column(Text, default="[]")  # 技能栈
-    interest_energy_curve_json: Mapped[str] = mapped_column(Text, default="[]")  # 兴趣能量曲线
-    cognitive_style: Mapped[str] = mapped_column(String(500), default="")  # 认知风格
-    value_boundaries_json: Mapped[str] = mapped_column(Text, default="[]")  # 价值边界
-    risk_tolerance: Mapped[int] = mapped_column(Integer, default=3)  # 风险承受度 1-5
-    time_investment_hours: Mapped[int] = mapped_column(Integer, default=0)  # 每周时间投入小时
+    # 六维画像字段：列表结构使用 JSON 文本存储。
+    skill_stack_json: Mapped[str] = mapped_column(Text, default="[]")
+    interest_energy_curve_json: Mapped[str] = mapped_column(Text, default="[]")
+    cognitive_style: Mapped[str] = mapped_column(String(500), default="")
+    value_boundaries_json: Mapped[str] = mapped_column(Text, default="[]")
+    risk_tolerance: Mapped[int] = mapped_column(Integer, default=3)  # 1-5
+    time_investment_hours: Mapped[int] = mapped_column(Integer, default=0)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -60,7 +66,7 @@ class CapabilityProfile(Base):
         default=lambda: datetime.now(timezone.utc),
     )
 
-    # Relationships
     session: Mapped["OnboardingSession"] = relationship(
-        "OnboardingSession", back_populates="capability_profile"
+        "OnboardingSession",
+        back_populates="capability_profile",
     )

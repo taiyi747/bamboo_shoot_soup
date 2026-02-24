@@ -1,4 +1,4 @@
-"""Launch kit API routes."""
+"""启动包 API 路由。"""
 
 from typing import Any
 
@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.schemas.launch_kit import LaunchKitGenerate, LaunchKitResponse
+from app.services.llm_client import LLMServiceError
 from app.services import launch_kit as launch_kit_service
 from app.services.event_log import log_event
 
@@ -19,16 +20,21 @@ def generate_launch_kit(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Generate 7-Day Launch Kit."""
-    kit = launch_kit_service.generate_launch_kit(
-        db=db,
-        user_id=body.user_id,
-        identity_model_id=body.identity_model_id,
-        constitution_id=body.constitution_id,
-        sustainable_columns=body.sustainable_columns,
-        growth_experiment_suggestion=body.growth_experiment_suggestion,
-    )
+    try:
+        # 请求体参数按原样传入 service，服务层负责 LLM 调用与落库。
+        kit = launch_kit_service.generate_launch_kit(
+            db=db,
+            user_id=body.user_id,
+            identity_model_id=body.identity_model_id,
+            constitution_id=body.constitution_id,
+            sustainable_columns=body.sustainable_columns,
+            growth_experiment_suggestion=body.growth_experiment_suggestion,
+        )
+    except LLMServiceError as error:
+        # 对外统一返回可观测的 502 结构，不透传上游原始响应。
+        raise HTTPException(status_code=502, detail=error.to_detail()) from error
 
-    # Log event
+    # 生成成功后记录 launch_kit_generated 事件。
     log_event(
         db=db,
         user_id=body.user_id,

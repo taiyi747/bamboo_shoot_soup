@@ -1,20 +1,21 @@
-"""Launch kit models - 7 day launch package."""
+"""7 天启动包模型。"""
 
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, Integer
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
 
 def _new_id() -> str:
+    """生成 UUID 主键。"""
     return str(uuid4())
 
 
 class LaunchKit(Base):
-    """7-Day Launch Kit container."""
+    """启动包主表：承载公共元数据。"""
 
     __tablename__ = "launch_kits"
 
@@ -27,9 +28,8 @@ class LaunchKit(Base):
         String(length=36), ForeignKey("persona_constitutions.id"), nullable=True
     )
 
-    # Kit metadata
-    sustainable_columns_json: Mapped[str] = mapped_column(Text, default="[]")  # 3个可持续栏目
-    growth_experiment_suggestion_json: Mapped[str] = mapped_column(Text, default="[]")  # 增长实验建议
+    sustainable_columns_json: Mapped[str] = mapped_column(Text, default="[]")  # 可持续栏目
+    growth_experiment_suggestion_json: Mapped[str] = mapped_column(Text, default="[]")  # 增长实验
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -37,14 +37,16 @@ class LaunchKit(Base):
         default=lambda: datetime.now(timezone.utc),
     )
 
-    # Relationships
+    # 一对多：一个启动包对应 7 条日计划。
     days: Mapped[list["LaunchKitDay"]] = relationship(
-        "LaunchKitDay", back_populates="kit", order_by="LaunchKitDay.day_no"
+        "LaunchKitDay",
+        back_populates="kit",
+        order_by="LaunchKitDay.day_no",
     )
 
 
 class LaunchKitDay(Base):
-    """Single day in 7-Day Launch Kit."""
+    """启动包单日内容。"""
 
     __tablename__ = "launch_kit_days"
 
@@ -54,15 +56,13 @@ class LaunchKitDay(Base):
     )
 
     day_no: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-7
-    theme: Mapped[str] = mapped_column(String(200), default="")  # 每日主题
-    draft_or_outline: Mapped[str] = mapped_column(Text, default="")  # 草稿或大纲
-    opening_text: Mapped[str] = mapped_column(Text, default="")  # 开头文本
-
+    theme: Mapped[str] = mapped_column(String(200), default="")
+    draft_or_outline: Mapped[str] = mapped_column(Text, default="")
+    opening_text: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
         default=lambda: datetime.now(timezone.utc),
     )
 
-    # Relationships
     kit: Mapped["LaunchKit"] = relationship("LaunchKit", back_populates="days")

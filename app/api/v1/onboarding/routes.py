@@ -1,4 +1,4 @@
-"""Onboarding API routes."""
+"""Onboarding API 路由。"""
 
 from typing import Any
 
@@ -24,9 +24,10 @@ def create_session(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Create a new onboarding session."""
+    # 1) 创建会话；2) 写入 onboarding_started 事件。
     session = onboarding_service.create_session(db, body.user_id)
     
-    # Log event
+    # 记录会话启动埋点。
     log_event(
         db=db,
         user_id=body.user_id,
@@ -45,6 +46,7 @@ def complete_session(
 ) -> dict[str, Any]:
     """Complete onboarding session and generate capability profile."""
     try:
+        # 透传六维画像输入，由 service 负责会话状态迁移与画像落库。
         session, profile = onboarding_service.complete_session(
             db=db,
             session_id=session_id,
@@ -57,7 +59,7 @@ def complete_session(
             time_investment_hours=body.time_investment_hours,
         )
         
-        # Log event
+        # 画像生成成功后记录完成事件。
         log_event(
             db=db,
             user_id=session.user_id,

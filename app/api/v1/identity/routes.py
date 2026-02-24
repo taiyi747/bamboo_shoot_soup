@@ -1,4 +1,4 @@
-"""Identity model API routes."""
+"""身份模型 API 路由。"""
 
 from typing import Any
 
@@ -12,6 +12,7 @@ from app.schemas.identity_model import (
     IdentitySelectionCreate,
     IdentitySelectionResponse,
 )
+from app.services.llm_client import LLMServiceError
 from app.services import identity_model as identity_service
 from app.services.event_log import log_event
 
@@ -31,7 +32,7 @@ def generate_identity_models(
     - tone_examples >= 5 sentences
     - long_term_views 5-10 items
     """
-    # Get capability profile if session_id provided
+    # 若提供 session_id，则优先读取已落库画像，覆盖请求体中的 capability_profile。
     capability_profile = body.capability_profile
     if body.session_id:
         from app.services.onboarding import get_profile
@@ -44,15 +45,20 @@ def generate_identity_models(
                 "risk_tolerance": profile.risk_tolerance,
             }
 
-    models = identity_service.generate_identity_models(
-        db=db,
-        user_id=body.user_id,
-        session_id=body.session_id,
-        capability_profile=capability_profile,
-        count=body.count,
-    )
+    try:
+        # 路由层只做参数组装，生成/校验逻辑全部在 service 内完成。
+        models = identity_service.generate_identity_models(
+            db=db,
+            user_id=body.user_id,
+            session_id=body.session_id,
+            capability_profile=capability_profile,
+            count=body.count,
+        )
+    except LLMServiceError as error:
+        # 统一返回结构化 502，避免泄露上游敏感信息。
+        raise HTTPException(status_code=502, detail=error.to_detail()) from error
 
-    # Log event
+    # 生成成功后记录埋点事件。
     log_event(
         db=db,
         user_id=body.user_id,
@@ -94,7 +100,7 @@ def get_identity_model(
     return model
 
 
-# Selection routes
+# 身份选择相关路由。
 selection_router = APIRouter(prefix="/identity-selections", tags=["identity"])
 
 
@@ -112,7 +118,7 @@ def select_identity(
             backup_identity_id=body.backup_identity_id,
         )
 
-        # Log event
+        # 主身份选择成功后记录事件。
         log_event(
             db=db,
             user_id=body.user_id,

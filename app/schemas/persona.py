@@ -1,4 +1,4 @@
-"""Persona constitution schemas."""
+"""人格宪法相关 Schema。"""
 
 from datetime import datetime
 
@@ -9,7 +9,7 @@ class PersonaConstitutionGenerate(BaseModel):
     """Generate persona constitution request."""
     user_id: str
     identity_model_id: str | None = None
-    # Optional inputs to guide generation
+    # 可选词汇提示：用于引导 LLM 输出风格。
     common_words: list[str] = Field(default_factory=list)
     forbidden_words: list[str] = Field(default_factory=list)
 
@@ -39,9 +39,9 @@ class RiskBoundaryItemCreate(BaseModel):
     identity_model_id: str | None = None
     constitution_id: str | None = None
     risk_level: int = Field(ge=1, le=5, default=3)
-    boundary_type: str = ""  # legal, platform, reputational
+    boundary_type: str = ""  # legal/platform/reputational
     statement: str = ""
-    source: str = "user_input"  # user_input or system_generated
+    source: str = "user_input"  # user_input/system_generated
 
 
 class RiskBoundaryItemResponse(BaseModel):

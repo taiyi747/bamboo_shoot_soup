@@ -1,20 +1,21 @@
-"""Persona constitution and risk boundary models."""
+"""人格宪法与风险边界模型。"""
 
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import DateTime, ForeignKey, String, Text, Integer
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
 
 
 def _new_id() -> str:
+    """生成 UUID 主键。"""
     return str(uuid4())
 
 
 class PersonaConstitution(Base):
-    """Persona Constitution - voice dictionary, moat positions, narrative mainline."""
+    """人格宪法：口吻词典、观点护城河、叙事主线、成长弧。"""
 
     __tablename__ = "persona_constitutions"
 
@@ -24,19 +25,17 @@ class PersonaConstitution(Base):
         String(length=36), ForeignKey("identity_models.id"), nullable=True
     )
 
-    # Required fields per product-spec 2.3
-    common_words_json: Mapped[str] = mapped_column(Text, default="[]")  # 常用词
-    forbidden_words_json: Mapped[str] = mapped_column(Text, default="[]")  # 禁用词
-    sentence_preferences_json: Mapped[str] = mapped_column(Text, default="[]")  # 句式偏好
-    moat_positions_json: Mapped[str] = mapped_column(Text, default="[]")  # 观点护城河 3条
-    narrative_mainline: Mapped[str] = mapped_column(Text, default="")  # 叙事主线
-    growth_arc_template: Mapped[str] = mapped_column(Text, default="")  # 成长Arc
+    # 业务内容字段：列表类内容统一为 JSON 文本。
+    common_words_json: Mapped[str] = mapped_column(Text, default="[]")
+    forbidden_words_json: Mapped[str] = mapped_column(Text, default="[]")
+    sentence_preferences_json: Mapped[str] = mapped_column(Text, default="[]")
+    moat_positions_json: Mapped[str] = mapped_column(Text, default="[]")
+    narrative_mainline: Mapped[str] = mapped_column(Text, default="")
+    growth_arc_template: Mapped[str] = mapped_column(Text, default="")
 
-    # Version management
+    # 版本链：支持宪法迭代与回溯。
     version: Mapped[int] = mapped_column(Integer, default=1)
-    previous_version_id: Mapped[str | None] = mapped_column(
-        String(length=36), nullable=True
-    )  # Link to previous version
+    previous_version_id: Mapped[str | None] = mapped_column(String(length=36), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -52,7 +51,7 @@ class PersonaConstitution(Base):
 
 
 class RiskBoundaryItem(Base):
-    """Risk and boundary items for an identity."""
+    """风险边界条目：用于约束发布前后的合规边界。"""
 
     __tablename__ = "risk_boundary_items"
 
@@ -66,9 +65,9 @@ class RiskBoundaryItem(Base):
     )
 
     risk_level: Mapped[int] = mapped_column(Integer, default=3)  # 1-5
-    boundary_type: Mapped[str] = mapped_column(String(50), default="")  # legal, platform, reputational
-    statement: Mapped[str] = mapped_column(Text, default="")  # The boundary statement
-    source: Mapped[str] = mapped_column(String(100), default="")  # user_input, system_generated
+    boundary_type: Mapped[str] = mapped_column(String(50), default="")  # legal/platform/reputational
+    statement: Mapped[str] = mapped_column(Text, default="")
+    source: Mapped[str] = mapped_column(String(100), default="")  # user_input/system_generated
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

@@ -1,4 +1,4 @@
-"""Event log API routes."""
+"""事件日志 API 路由。"""
 
 from typing import Any
 
@@ -27,6 +27,7 @@ def create_event(
     - stage must be MVP/V1/V2
     """
     try:
+        # 事件校验（event_name/stage）下沉在 service 层执行。
         event = event_service.log_event(
             db=db,
             user_id=body.user_id,

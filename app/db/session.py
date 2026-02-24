@@ -1,3 +1,5 @@
+"""数据库引擎、Session 工厂与请求级依赖。"""
+
 from collections.abc import Generator
 from pathlib import Path
 
@@ -9,6 +11,7 @@ from app.core.config import get_settings
 
 
 def _ensure_sqlite_directory(database_url: str) -> None:
+    """若使用文件型 SQLite，则确保数据库目录存在。"""
     url = make_url(database_url)
     if not url.drivername.startswith("sqlite"):
         return
@@ -24,8 +27,10 @@ def _ensure_sqlite_directory(database_url: str) -> None:
 
 
 def _connect_args(database_url: str) -> dict[str, object]:
+    """根据数据库驱动构建 connect_args。"""
     url = make_url(database_url)
     if url.drivername.startswith("sqlite"):
+        # FastAPI 请求处理可能跨线程，SQLite 需关闭线程检查。
         return {"check_same_thread": False}
     return {}
 
@@ -48,6 +53,7 @@ SessionLocal = sessionmaker(
 
 
 def get_db() -> Generator[Session, None, None]:
+    """提供请求级 Session，并在请求结束后关闭连接。"""
     db = SessionLocal()
     try:
         yield db

@@ -1,4 +1,4 @@
-"""Identity model schemas."""
+"""身份模型相关 Schema。"""
 
 from datetime import datetime
 from typing import Any
@@ -10,7 +10,7 @@ class IdentityModelGenerate(BaseModel):
     """Generate identity model request."""
     user_id: str
     session_id: str | None = None
-    # Inputs for generating identity models
+    # 若提供 session_id，服务端可从画像表覆盖该输入。
     capability_profile: dict[str, Any] = Field(default_factory=dict)
     count: int = Field(ge=3, le=5, default=3)
 
@@ -47,6 +47,7 @@ class IdentitySelectionCreate(BaseModel):
     @field_validator("backup_identity_id")
     @classmethod
     def validate_different_ids(cls, v, info):
+        # 请求层提前拦截主备相同，减少无效数据库操作。
         if v is not None and "primary_identity_id" in info.data:
             if v == info.data["primary_identity_id"]:
                 raise ValueError("backup_identity_id must be different from primary_identity_id")

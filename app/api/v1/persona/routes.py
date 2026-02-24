@@ -1,4 +1,4 @@
-"""Persona constitution API routes."""
+"""人格宪法 API 路由。"""
 
 from typing import Any
 
@@ -12,6 +12,7 @@ from app.schemas.persona import (
     RiskBoundaryItemCreate,
     RiskBoundaryItemResponse,
 )
+from app.services.llm_client import LLMServiceError
 from app.services import persona as persona_service
 
 router = APIRouter(prefix="/persona-constitutions", tags=["persona"])
@@ -23,13 +24,18 @@ def generate_constitution(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Generate persona constitution."""
-    constitution = persona_service.generate_constitution(
-        db=db,
-        user_id=body.user_id,
-        identity_model_id=body.identity_model_id,
-        common_words=body.common_words,
-        forbidden_words=body.forbidden_words,
-    )
+    try:
+        # 透传用户输入提示词到服务层，服务层负责调用 LLM 与结构校验。
+        constitution = persona_service.generate_constitution(
+            db=db,
+            user_id=body.user_id,
+            identity_model_id=body.identity_model_id,
+            common_words=body.common_words,
+            forbidden_words=body.forbidden_words,
+        )
+    except LLMServiceError as error:
+        # LLM 相关异常统一映射为结构化 502。
+        raise HTTPException(status_code=502, detail=error.to_detail()) from error
 
     return {
         "id": constitution.id,
@@ -72,7 +78,7 @@ def get_constitution(
     return constitution
 
 
-# Risk boundary routes
+# 风险边界维护路由。
 risk_router = APIRouter(prefix="/risk-boundaries", tags=["risk"])
 
 
