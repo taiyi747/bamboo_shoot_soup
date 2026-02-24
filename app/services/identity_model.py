@@ -1,7 +1,8 @@
-"""身份模型服务。"""
+"""Identity model service."""
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 import json
 from typing import Any
 
@@ -16,7 +17,7 @@ from app.services.llm_client import get_llm_client, llm_schema_error
 
 
 class _IdentityCandidate(BaseModel):
-    """LLM 返回的单个身份候选结构。"""
+    """Single identity candidate returned by LLM."""
 
     title: str
     target_audience_pain: str
@@ -50,13 +51,14 @@ class _IdentityCandidate(BaseModel):
 
 
 class _IdentityGenerationResponse(BaseModel):
-    """身份生成服务期望的顶层响应结构。"""
+    """Top-level response shape for identity generation."""
 
     models: list[_IdentityCandidate]
 
 
 IDENTITY_MODELS_PROMPT = """
 You are generating identity model cards for a creator product.
+Each request should be handled independently. Do not assume access to previous or future requests.
 Return strict JSON only with this shape:
 {
   "models": [
@@ -77,6 +79,7 @@ Return strict JSON only with this shape:
 }
 Hard constraints:
 - model count must exactly equal requested count.
+- when requested count is 1, return exactly one model.
 - differentiation must be non-empty.
 - tone_examples must contain at least 5 entries.
 - long_term_views must contain 5-10 entries.
@@ -88,8 +91,10 @@ Hard constraints:
   - every item in models[i].risk_boundary is a non-empty string
 """.strip()
 
+
 def _parse_identity_models(payload: dict[str, Any], count: int) -> list[_IdentityCandidate]:
-    """校验 LLM 响应并强制候选数量与请求一致。"""
+    """Validate LLM response schema and model count."""
+
     try:
         result = _IdentityGenerationResponse.model_validate(payload)
     except ValidationError as exc:
@@ -106,8 +111,31 @@ def _parse_identity_models(payload: dict[str, Any], count: int) -> list[_Identit
     return result.models
 
 
+def _generate_identity_candidates_parallel(
+    *,
+    count: int,
+    llm_payload: dict[str, Any],
+) -> list[_IdentityCandidate]:
+    """Generate candidates in parallel, one candidate per request."""
+
+    def _generate_one(_index: int) -> _IdentityCandidate:
+        payload = dict(llm_payload)
+        payload["count"] = 1
+        response_payload = get_llm_client().generate_json(
+            operation="generate_identity_models",
+            system_prompt=IDENTITY_MODELS_PROMPT,
+            user_payload=payload,
+        )
+        candidates = _parse_identity_models(response_payload, count=1)
+        return candidates[0]
+
+    with ThreadPoolExecutor(max_workers=count) as executor:
+        return list(executor.map(_generate_one, range(count)))
+
+
 def _replace_user_identity_models(db: Session, user_id: str) -> None:
     """Replace all identity models for a user and unlink old downstream references."""
+
     existing_model_ids = [
         model_id
         for (model_id,) in db.query(IdentityModel.id).filter(IdentityModel.user_id == user_id).all()
@@ -154,23 +182,8 @@ def generate_identity_models(
     capability_profile: dict,
     count: int = 3,
 ) -> list[IdentityModel]:
-    """
-    # 任务：生成人格模型
+    """Generate identity models and replace previous batch atomically."""
 
-    **任务目标：**
-    请生成 3-5 个不同的**人格模型（Identity Models）**。
-
-    **输出要求：**
-    所有生成的内容必须使用**中文**，且每个模型必须严格遵守产品说明书 2.6 的业务规则：
-
-    1. **差异化定位 (Differentiation)**：必须提供明确的定位说明，内容不得为空。
-    2. **语气示例 (Tone Examples)**：必须提供至少 5 句代表该人格说话风格的例句。
-    3. **长期愿景 (Long-term Views)**：必须列出 5-10 项具体的长期观点或发展目标。
-    4. **变现验证流程 (Monetization Validation Order)**：必须包含至少 1 个具体的变现验证步骤。
-
-    **输出格式：**
-    请使用清晰的 Markdown 结构（标题、列表等）输出每一个模型的信息。
-    """
     llm_payload = {
         "user_id": user_id,
         "session_id": session_id,
@@ -178,17 +191,9 @@ def generate_identity_models(
         "capability_profile": capability_profile,
     }
 
-    # 第一步：向 LLM 请求严格 JSON 输出。
-    response_payload = get_llm_client().generate_json(
-        operation="generate_identity_models",
-        system_prompt=IDENTITY_MODELS_PROMPT,
-        user_payload=llm_payload,
-    )
-    # 第二步：先做 schema/业务规则校验，再进入落库。
-    candidates = _parse_identity_models(response_payload, count=count)
+    candidates = _generate_identity_candidates_parallel(count=count, llm_payload=llm_payload)
     _replace_user_identity_models(db, user_id)
 
-    # 第三步：将校验后的结构映射到 ORM 模型。
     models: list[IdentityModel] = []
     for candidate in candidates:
         model = IdentityModel(
@@ -212,7 +217,6 @@ def generate_identity_models(
         db.add(model)
         models.append(model)
 
-    # 所有候选都通过校验后再一次性提交事务。
     db.commit()
     for model in models:
         db.refresh(model)
@@ -226,11 +230,10 @@ def select_identity(
     backup_identity_id: str | None = None,
 ) -> IdentitySelection:
     """Save user's primary and backup identity selection."""
-    # 业务约束：主备身份不能相同。
+
     if backup_identity_id and primary_identity_id == backup_identity_id:
         raise ValueError("backup_identity_id must be different from primary_identity_id")
 
-    # 先确保被选身份存在，再执行状态更新。
     primary = db.query(IdentityModel).filter(IdentityModel.id == primary_identity_id).first()
     if not primary:
         raise ValueError(f"Identity {primary_identity_id} not found")
@@ -240,7 +243,6 @@ def select_identity(
         if not backup:
             raise ValueError(f"Identity {backup_identity_id} not found")
 
-    # 清理旧标记，保证每个用户仅有一组主备标识。
     db.query(IdentityModel).filter(
         IdentityModel.user_id == user_id,
         (IdentityModel.is_primary == True) | (IdentityModel.is_backup == True),
@@ -251,7 +253,6 @@ def select_identity(
         backup = db.query(IdentityModel).filter(IdentityModel.id == backup_identity_id).first()
         backup.is_backup = True
 
-    # 除字段标记外，保留一条选择历史记录用于追踪。
     selection = IdentitySelection(
         user_id=user_id,
         primary_identity_id=primary_identity_id,
@@ -265,6 +266,7 @@ def select_identity(
 
 def get_user_identity_models(db: Session, user_id: str) -> list[IdentityModel]:
     """Get all identity models for a user."""
+
     return (
         db.query(IdentityModel)
         .filter(IdentityModel.user_id == user_id)
@@ -275,11 +277,13 @@ def get_user_identity_models(db: Session, user_id: str) -> list[IdentityModel]:
 
 def get_identity_model(db: Session, model_id: str) -> IdentityModel | None:
     """Get identity model by ID."""
+
     return db.query(IdentityModel).filter(IdentityModel.id == model_id).first()
 
 
 def get_user_selection(db: Session, user_id: str) -> IdentitySelection | None:
     """Get user's current identity selection."""
+
     return (
         db.query(IdentitySelection)
         .filter(IdentitySelection.user_id == user_id)

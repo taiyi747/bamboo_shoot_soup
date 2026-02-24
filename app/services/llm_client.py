@@ -125,6 +125,7 @@ class LLMClient:
         self._openai = openai
         self._model_name = settings.model_name or ""
         self._max_retries = settings.openai_max_retries
+        self._reason = settings.reason
         self._client = OpenAI(
             api_key=settings.openai_api_key,
             base_url=normalize_openai_base_url(settings.openai_base_url or ""),
@@ -174,14 +175,83 @@ class LLMClient:
             },
         ]
 
-        try:
-            completion = self._client.chat.completions.create(
-                model=self._model_name,
-                messages=messages,
-                # 严格模式：始终要求上游返回 JSON 对象。
-                response_format={"type": "json_object"},
-                temperature=0.2,
+        completion = self._create_completion_with_reason_fallback(
+            operation=operation,
+            messages=messages,
+        )
+
+        request_id = getattr(completion, "_request_id", None)
+        content = ""
+        if completion.choices:
+            content = completion.choices[0].message.content or ""
+        content = _strip_code_fence(content.strip())
+
+        if not content:
+            raise LLMServiceError(
+                code="LLM_INVALID_RESPONSE",
+                message="LLM response content is empty.",
+                operation=operation,
+                provider_request_id=request_id,
+                retryable=True,
             )
+
+        try:
+            payload = json.loads(content)
+        except json.JSONDecodeError as exc:
+            raise LLMServiceError(
+                code="LLM_INVALID_RESPONSE",
+                message="LLM response is not valid JSON.",
+                operation=operation,
+                provider_request_id=request_id,
+                retryable=True,
+            ) from exc
+
+        if not isinstance(payload, dict):
+            raise LLMServiceError(
+                code="LLM_INVALID_RESPONSE",
+                message="LLM response JSON must be an object.",
+                operation=operation,
+                provider_request_id=request_id,
+                retryable=True,
+            )
+
+        return payload
+
+    def _build_completion_request(
+        self,
+        *,
+        messages: list[dict[str, str]],
+        include_reason: bool,
+    ) -> dict[str, Any]:
+        request: dict[str, Any] = {
+            "model": self._model_name,
+            "messages": messages,
+            # 严格模式：始终要求上游返回 JSON 对象。
+            "response_format": {"type": "json_object"},
+            "temperature": 0.2,
+        }
+        if include_reason and self._reason is not None:
+            extra_body: dict[str, Any] = {"easoning": self._reason}
+            # For many OpenAI-compatible gateways, reason=false alone does not
+            # disable reasoning, while enable_thinking=false does.
+            if self._reason is False:
+                extra_body["enable_thinking"] = False
+            request["extra_body"] = extra_body
+        return request
+
+    def _create_completion(
+        self,
+        *,
+        operation: str,
+        messages: list[dict[str, str]],
+        include_reason: bool,
+    ) -> Any:
+        request = self._build_completion_request(
+            messages=messages,
+            include_reason=include_reason,
+        )
+        try:
+            return self._client.chat.completions.create(**request)
         except self._openai.APITimeoutError as exc:
             raise LLMServiceError(
                 code="LLM_UPSTREAM_TIMEOUT",
@@ -220,42 +290,31 @@ class LLMClient:
                 retryable=False,
             ) from exc
 
-        request_id = getattr(completion, "_request_id", None)
-        content = ""
-        if completion.choices:
-            content = completion.choices[0].message.content or ""
-        content = _strip_code_fence(content.strip())
-
-        if not content:
-            raise LLMServiceError(
-                code="LLM_INVALID_RESPONSE",
-                message="LLM response content is empty.",
-                operation=operation,
-                provider_request_id=request_id,
-                retryable=True,
-            )
-
+    def _create_completion_with_reason_fallback(
+        self,
+        *,
+        operation: str,
+        messages: list[dict[str, str]],
+    ) -> Any:
+        include_reason = self._reason is not None
         try:
-            payload = json.loads(content)
-        except json.JSONDecodeError as exc:
-            raise LLMServiceError(
-                code="LLM_INVALID_RESPONSE",
-                message="LLM response is not valid JSON.",
+            return self._create_completion(
                 operation=operation,
-                provider_request_id=request_id,
-                retryable=True,
-            ) from exc
-
-        if not isinstance(payload, dict):
-            raise LLMServiceError(
-                code="LLM_INVALID_RESPONSE",
-                message="LLM response JSON must be an object.",
-                operation=operation,
-                provider_request_id=request_id,
-                retryable=True,
+                messages=messages,
+                include_reason=include_reason,
             )
-
-        return payload
+        except LLMServiceError as error:
+            if (
+                include_reason
+                and error.code == "LLM_UPSTREAM_HTTP_ERROR"
+                and error.provider_status in {400, 422}
+            ):
+                return self._create_completion(
+                    operation=operation,
+                    messages=messages,
+                    include_reason=False,
+                )
+            raise
 
 
 @lru_cache(maxsize=1)

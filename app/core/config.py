@@ -3,7 +3,7 @@
 import json
 from functools import lru_cache
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     openai_base_url: str | None = None
     model_name: str | None = None
+    reasoning: bool | None = None
+    # Legacy compatibility: map REASON -> REASONING when REASONING is not set.
+    reason: bool | None = None
     openai_timeout_seconds: float = Field(default=90.0, gt=0)
     openai_max_retries: int = Field(default=2, ge=0)
 
@@ -48,6 +51,12 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore",
     )
+
+    @model_validator(mode="after")
+    def normalize_reasoning_flag(self) -> "Settings":
+        if self.reasoning is None and self.reason is not None:
+            self.reasoning = self.reason
+        return self
 
     def validate_llm_settings(self) -> None:
         """在服务启动前校验 LLM 必填环境变量。"""

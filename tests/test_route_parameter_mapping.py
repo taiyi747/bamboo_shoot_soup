@@ -126,6 +126,7 @@ def test_launch_kit_route_passes_expected_parameters(monkeypatch, tmp_path) -> N
             return SimpleNamespace(
                 id="kit-1",
                 user_id=user_id,
+                identity_model_id=kwargs.get("identity_model_id"),
                 days=[SimpleNamespace(day_no=1, theme="t", opening_text="o")],
             )
 

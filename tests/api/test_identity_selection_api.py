@@ -1,10 +1,47 @@
 from __future__ import annotations
 
+import copy
+import threading
+
 from fastapi.testclient import TestClient
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import sessionmaker
 
 from app.models.identity_model import IdentityModel
+from app.services import identity_model as identity_service
 from tests.api.helpers import create_identity_model
+
+
+class _FakeLLMClient:
+    def __init__(self, payload_by_operation: dict[str, list[dict]]) -> None:
+        self._payload_by_operation = copy.deepcopy(payload_by_operation)
+        self._lock = threading.Lock()
+
+    def generate_json(self, *, operation: str, system_prompt: str, user_payload: dict) -> dict:
+        with self._lock:
+            operation_payload = self._payload_by_operation[operation]
+            if not operation_payload:
+                raise AssertionError(f"no payload left for operation={operation}")
+            return copy.deepcopy(operation_payload.pop(0))
+
+
+def _identity_model_payload(prefix: str, label: str) -> dict:
+    return {
+        "models": [
+            {
+                "title": f"{prefix} {label}",
+                "target_audience_pain": f"Pain {label}",
+                "content_pillars": ["P1", "P2", "P3"],
+                "tone_keywords": ["k1", "k2"],
+                "tone_examples": ["e1", "e2", "e3", "e4", "e5"],
+                "long_term_views": ["v1", "v2", "v3", "v4", "v5"],
+                "differentiation": f"{prefix} Diff {label}",
+                "growth_path_0_3m": f"Plan {label}1",
+                "growth_path_3_12m": f"Plan {label}2",
+                "monetization_validation_order": ["m1"],
+                "risk_boundary": ["r1"],
+            }
+        ]
+    }
 
 
 def test_identity_read_endpoints_return_seeded_models(
@@ -29,6 +66,61 @@ def test_identity_read_endpoints_return_seeded_models(
 def test_get_identity_model_not_found_returns_404(client: TestClient) -> None:
     response = client.get("/v1/identity-models/missing-model")
     assert response.status_code == 404
+
+
+def test_get_user_identity_models_returns_latest_generated_batch_only(
+    client: TestClient,
+    user_id: str,
+    session_local: sessionmaker,
+    monkeypatch,
+) -> None:
+    fake_client = _FakeLLMClient(
+        {
+            "generate_identity_models": [
+                _identity_model_payload("Batch1", "A"),
+                _identity_model_payload("Batch1", "B"),
+                _identity_model_payload("Batch1", "C"),
+                _identity_model_payload("Batch2", "A"),
+                _identity_model_payload("Batch2", "B"),
+                _identity_model_payload("Batch2", "C"),
+            ]
+        }
+    )
+    monkeypatch.setattr(identity_service, "get_llm_client", lambda: fake_client)
+
+    first_generate = client.post(
+        "/v1/identity-models/generate",
+        json={
+            "user_id": user_id,
+            "session_id": None,
+            "capability_profile": {"skill_stack": ["python"]},
+            "count": 3,
+        },
+    )
+    assert first_generate.status_code == 200
+    first_ids = {item["id"] for item in first_generate.json()}
+
+    second_generate = client.post(
+        "/v1/identity-models/generate",
+        json={
+            "user_id": user_id,
+            "session_id": None,
+            "capability_profile": {"skill_stack": ["python"]},
+            "count": 3,
+        },
+    )
+    assert second_generate.status_code == 200
+    second_ids = {item["id"] for item in second_generate.json()}
+
+    list_response = client.get(f"/v1/identity-models/users/{user_id}")
+    assert list_response.status_code == 200
+    listed_ids = {item["id"] for item in list_response.json()}
+    assert listed_ids == second_ids
+    assert listed_ids.isdisjoint(first_ids)
+
+    with session_local() as db:
+        db_models = db.query(IdentityModel).filter(IdentityModel.user_id == user_id).all()
+    assert {model.id for model in db_models} == second_ids
 
 
 def test_select_identity_updates_flags_and_logs_event(

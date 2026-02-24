@@ -40,7 +40,7 @@ def generate_launch_kit(
         user_id=body.user_id,
         event_name="launch_kit_generated",
         stage="MVP",
-        identity_model_id=body.identity_model_id,
+        identity_model_id=kit.identity_model_id,
     )
 
     return {

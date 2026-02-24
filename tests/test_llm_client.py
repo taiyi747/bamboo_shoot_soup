@@ -38,10 +38,11 @@ class _Completion:
         self._request_id = request_id
 
 
-def _build_client(create_func, retries: int = 0) -> LLMClient:
+def _build_client(create_func, retries: int = 0, reasoning: bool | None = None) -> LLMClient:
     client = object.__new__(LLMClient)
     client._max_retries = retries
     client._model_name = "test-model"
+    client._reasoning = reasoning
     client._openai = SimpleNamespace(
         APITimeoutError=_DummyTimeoutError,
         APIConnectionError=_DummyConnectionError,
@@ -145,6 +146,96 @@ def test_generate_json_uses_strict_openai_chat_completions_format() -> None:
     assert captured["messages"][0]["content"] == "system prompt"
     assert captured["messages"][1]["role"] == "user"
     assert '"foo": "bar"' in captured["messages"][1]["content"]
+
+
+def test_generate_json_includes_reasoning_true_when_enabled() -> None:
+    captured: dict = {}
+
+    def _create(**kwargs):
+        captured.update(kwargs)
+        return _Completion('{"ok": true}')
+
+    client = _build_client(_create, retries=0, reasoning=True)
+
+    payload = client.generate_json(
+        operation="test_reasoning_true",
+        system_prompt="system prompt",
+        user_payload={"foo": "bar"},
+    )
+
+    assert payload == {"ok": True}
+    assert captured["extra_body"] == {"reasoning": True}
+
+
+def test_generate_json_includes_reasoning_false_when_disabled() -> None:
+    captured: dict = {}
+
+    def _create(**kwargs):
+        captured.update(kwargs)
+        return _Completion('{"ok": true}')
+
+    client = _build_client(_create, retries=0, reasoning=False)
+
+    payload = client.generate_json(
+        operation="test_reasoning_false",
+        system_prompt="system prompt",
+        user_payload={"foo": "bar"},
+    )
+
+    assert payload == {"ok": True}
+    assert captured["extra_body"] == {"reasoning": False, "enable_thinking": False}
+
+
+@pytest.mark.parametrize("status_code", [400, 422])
+def test_generate_json_retries_without_reasoning_on_reasoning_status_errors(status_code: int) -> None:
+    calls: list[dict] = []
+
+    def _create(**kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            raise _DummyStatusError(status_code)
+        return _Completion('{"ok": true}')
+
+    client = _build_client(_create, retries=0, reasoning=True)
+
+    payload = client.generate_json(
+        operation="test_reasoning_fallback_success",
+        system_prompt="prompt",
+        user_payload={"foo": "bar"},
+    )
+
+    assert payload == {"ok": True}
+    assert len(calls) == 2
+    assert calls[0]["extra_body"] == {"reasoning": True}
+    assert "extra_body" not in calls[1]
+
+
+def test_generate_json_reasoning_fallback_failure_preserves_error_contract() -> None:
+    calls: list[dict] = []
+
+    def _create(**kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            raise _DummyStatusError(400)
+        raise _DummyStatusError(500)
+
+    client = _build_client(_create, retries=0, reasoning=True)
+
+    with pytest.raises(LLMServiceError) as exc_info:
+        client.generate_json(
+            operation="test_reasoning_fallback_failure",
+            system_prompt="prompt",
+            user_payload={"foo": "bar"},
+        )
+
+    error = exc_info.value
+    assert error.code == "LLM_UPSTREAM_HTTP_ERROR"
+    assert error.provider_status == 500
+    assert error.retryable is True
+    assert error.attempts == 1
+    assert len(calls) == 2
+    assert calls[0]["extra_body"] == {"reasoning": True}
+    assert "extra_body" not in calls[1]
 
 
 def test_generate_json_does_not_retry_on_400_status() -> None:
