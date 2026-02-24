@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1 import v1_router
 from app.api.v1.health import router as health_router
 from app.core.config import get_settings
+from app.db.migrations import upgrade_database_to_head
 from app.services.llm_client import ensure_llm_ready
 
 settings = get_settings()
@@ -25,6 +26,16 @@ app.add_middleware(
 
 app.include_router(health_router)
 app.include_router(v1_router)
+
+
+@app.on_event("startup")
+def initialize_database() -> None:
+    try:
+        upgrade_database_to_head()
+    except Exception as exc:
+        raise RuntimeError(
+            f"Application startup failed due to database migration error: {exc}"
+        ) from exc
 
 
 @app.on_event("startup")

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.core.config import get_settings
 
 
-def _ensure_sqlite_directory(database_url: str) -> None:
+def ensure_sqlite_directory(database_url: str) -> None:
     """若使用文件型 SQLite，则确保数据库目录存在。"""
     url = make_url(database_url)
     if not url.drivername.startswith("sqlite"):
@@ -36,7 +36,7 @@ def _connect_args(database_url: str) -> dict[str, object]:
 
 
 settings = get_settings()
-_ensure_sqlite_directory(settings.database_url)
+ensure_sqlite_directory(settings.database_url)
 
 engine = create_engine(
     settings.database_url,

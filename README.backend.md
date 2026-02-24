@@ -24,6 +24,8 @@ cp .env.example .env
 uvicorn app.main:app --reload
 ```
 
+On startup, the backend automatically runs `alembic upgrade head` against `DATABASE_URL`.
+
 Health check:
 
 ```bash
@@ -32,7 +34,7 @@ curl http://127.0.0.1:8000/health
 
 ## Database Migrations
 
-Upgrade to latest:
+Manual upgrade to latest:
 
 ```bash
 alembic upgrade head
