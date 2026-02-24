@@ -81,12 +81,13 @@ class _ContextResolutionResult:
 
 
 LAUNCH_KIT_PROMPT = """
-You are a content growth assistant generating a 7-day launch kit for creators.
-Return strict JSON only. Do not output markdown, prose, comments, or code fences.
+你是一名内容增长助手，需要为创作者生成 7 天启动包（launch kit）。
+Return strict JSON only.
+只返回严格 JSON。不要输出 markdown、说明性文字、注释或代码块围栏。
 
-Expected JSON shape:
+期望 JSON 结构：
 {
-  "sustainable_columns": ["string", "... at least 3 items"],
+  "sustainable_columns": ["string", "... 至少 3 项"],
   "growth_experiment_suggestion": [
     {
       "name": "string",
@@ -100,45 +101,47 @@ Expected JSON shape:
     {
       "day_no": 1,
       "theme": "string",
-      "draft_or_outline": "string",
+      "draft_or_outline": "string",// 该字段必须为非空字符串，字数大于128
       "opening_text": "string"
     }
   ]
 }
 
-Hard constraints:
-- days must contain exactly 7 entries.
-- day_no must be unique and must cover 1..7.
-- Each day entry must contain only: day_no, theme, draft_or_outline, opening_text.
-- theme, draft_or_outline, opening_text must be non-empty strings.
-- sustainable_columns must contain at least 3 non-empty strings.
-- growth_experiment_suggestion must contain at least 1 item.
-- Do not use HTML tags such as <br>.
+硬性约束：
+- days 必须且只能包含 7 条记录。
+- day_no 必须唯一，并完整覆盖 1..7。
+- 每个 day 条目只能包含：day_no、theme、draft_or_outline、opening_text。
+- theme、draft_or_outline、opening_text 必须为非空字符串。
+- sustainable_columns 至少包含 3 个非空字符串。
+- growth_experiment_suggestion 至少包含 1 项。
+- 不要使用 HTML 标签，例如 <br>。
 
 Context alignment constraints:
-- You will receive context_bundle in the user payload.
-- If context_bundle.identity_model exists, align day themes and draft outlines with its content_pillars, differentiation, and target_audience_pain.
-- If context_bundle.persona_constitution exists, follow common_words, forbidden_words, sentence_preferences, and narrative_mainline.
-- If context_bundle.risk_boundaries is non-empty, avoid expressions that clearly conflict with those boundaries.
-- If context_bundle.capability_profile exists, make experiment cadence realistic for risk_tolerance and time_investment_hours.
-- If any context block is missing, only use available context and never invent missing facts.
+上下文对齐约束：
+- 你会在用户载荷中收到 context_bundle。
+- 如果存在 context_bundle.identity_model，day 的主题与草稿/大纲要对齐其 content_pillars、differentiation、target_audience_pain。
+- 如果存在 context_bundle.persona_constitution，需遵循 common_words、forbidden_words、sentence_preferences、narrative_mainline。
+- 如果 context_bundle.risk_boundaries 非空，避免使用与其明显冲突的表达。
+- 如果存在 context_bundle.capability_profile，实验节奏要符合 risk_tolerance 与 time_investment_hours。
+- 若任何 context 块缺失，只使用已有上下文，禁止虚构缺失事实。
 
-Self-check before returning:
-1) days length is 7
-2) day_no is exactly 1..7 with no duplicates
-3) every day has non-empty draft_or_outline
-4) no extra keys are introduced
+返回前自检：
+1) days 长度为 7
+2) day_no 恰好覆盖 1..7 且无重复
+3) 每一天都包含非空 draft_or_outline
+4) 不引入任何额外 key
 """.strip()
 
 LAUNCH_KIT_REPAIR_PROMPT = """
 You are repairing an invalid 7-day launch kit JSON.
-You will receive: original_user_payload, previous_invalid_response, validation_error.
-Return strict JSON only with the exact target schema.
-Do not output markdown, prose, comments, or code fences.
+你正在修复一个不合法的 7 天 launch kit JSON。
+你将收到：original_user_payload、previous_invalid_response、validation_error。
+只返回严格 JSON，且必须完全符合目标 schema。
+不要输出 markdown、说明性文字、注释或代码块围栏。
 
-Schema:
+Schema：
 {
-  "sustainable_columns": ["string", "... at least 3 items"],
+  "sustainable_columns": ["string", "... 至少 3 项"],
   "growth_experiment_suggestion": [
     {
       "name": "string",
@@ -152,19 +155,19 @@ Schema:
     {
       "day_no": 1,
       "theme": "string",
-      "draft_or_outline": "string",
+      "draft_or_outline": "string",// 该字段必须为非空字符串，字数大于128
       "opening_text": "string"
     }
   ]
 }
 
-Hard constraints:
-- Keep exactly 7 days.
-- day_no must be unique and cover 1..7.
-- Keep only allowed day keys.
-- Keep all required fields non-empty.
-- Keep at least 3 sustainable_columns and at least 1 growth_experiment_suggestion.
-- Preserve semantic alignment with context_bundle from original_user_payload.
+硬性约束：
+- 必须保留且仅保留 7 天。
+- day_no 必须唯一并覆盖 1..7。
+- day 仅保留允许的字段 key。
+- 所有必填字段必须非空。
+- sustainable_columns 至少 3 项，growth_experiment_suggestion 至少 1 项。
+- 必须保持与 original_user_payload 中 context_bundle 的语义对齐。
 """.strip()
 
 

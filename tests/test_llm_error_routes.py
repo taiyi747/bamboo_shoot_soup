@@ -181,6 +181,7 @@ def test_consistency_route_returns_degraded_payload_and_event(monkeypatch, tmp_p
             )
             return consistency_service.ConsistencyCheckExecutionResult(
                 check=check,
+                score=60,
                 degraded=True,
                 degrade_reason="llm_schema_retry_exhausted",
                 schema_repair_attempts=2,
@@ -196,6 +197,7 @@ def test_consistency_route_returns_degraded_payload_and_event(monkeypatch, tmp_p
         assert body["degraded"] is True
         assert body["degrade_reason"] == "llm_schema_retry_exhausted"
         assert body["schema_repair_attempts"] == 2
+        assert body["score"] == 60
 
         events_response = client.get(f"/v1/events/users/{user_id}", params={"limit": 20})
         assert events_response.status_code == 200
@@ -203,6 +205,7 @@ def test_consistency_route_returns_degraded_payload_and_event(monkeypatch, tmp_p
         consistency_events = [e for e in events if e["event_name"] == "consistency_check_triggered"]
         assert consistency_events
         payload = json.loads(consistency_events[0]["payload_json"])
+        assert payload["score"] == 60
         assert payload["degraded"] is True
         assert payload["degrade_reason"] == "llm_schema_retry_exhausted"
         assert payload["schema_repair_attempts"] == 2

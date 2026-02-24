@@ -7,7 +7,7 @@ import json
 import logging
 from typing import Any
 
-from pydantic import BaseModel, ValidationError, model_validator
+from pydantic import BaseModel, ValidationError, field_validator, model_validator
 from sqlalchemy.orm import Session
 
 from app.models.consistency_check import ConsistencyCheck
@@ -22,6 +22,7 @@ DEGRADE_REASON_SCHEMA_RETRY_EXHAUSTED = "llm_schema_retry_exhausted"
 @dataclass
 class ConsistencyCheckExecutionResult:
     check: ConsistencyCheck
+    score: int
     degraded: bool
     degrade_reason: str | None
     schema_repair_attempts: int
@@ -35,6 +36,31 @@ class _ConsistencyCheckOutput(BaseModel):
     suggestions: list[str]
     risk_triggered: bool
     risk_warning: str = ""
+    score: int
+
+    @field_validator("score", mode="before")
+    @classmethod
+    def parse_score(cls, value: Any) -> int:
+        if isinstance(value, bool):
+            raise ValueError("score must be an integer between 0 and 100")
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float):
+            if not value.is_integer():
+                raise ValueError("score must be an integer between 0 and 100")
+            return int(value)
+        if isinstance(value, str):
+            raw = value.strip()
+            if not raw:
+                raise ValueError("score must be an integer between 0 and 100")
+            try:
+                as_float = float(raw)
+            except ValueError as exc:
+                raise ValueError("score must be an integer between 0 and 100") from exc
+            if not as_float.is_integer():
+                raise ValueError("score must be an integer between 0 and 100")
+            return int(as_float)
+        raise ValueError("score must be an integer between 0 and 100")
 
     @model_validator(mode="after")
     def validate_business_rules(self) -> "_ConsistencyCheckOutput":
@@ -46,6 +72,8 @@ class _ConsistencyCheckOutput(BaseModel):
             raise ValueError("suggestions must contain at least 1 item")
         if self.risk_triggered and not self.risk_warning.strip():
             raise ValueError("risk_warning is required when risk_triggered is true")
+        if self.score < 0 or self.score > 100:
+            raise ValueError("score must be between 0 and 100")
         return self
 
 
@@ -57,17 +85,20 @@ CONSISTENCY_CHECK_PROMPT = """
   "deviation_reasons": ["string", "...至少 1 个元素"],
   "suggestions": ["string", "...至少 1 个元素"],
   "risk_triggered": boolean,
-  "risk_warning": "string"
+  "risk_warning": "string",
+  "score": 0
 }
 
 强制约束条件（Hard constraints）：
 - 【结构锁定】必须完全保留上述指定的 Keys，绝对禁止添加任何额外的 Keys。
 - 【数组约束】所有三个数组（deviation_items, deviation_reasons, suggestions）必须包含至少 1 个非空字符串。
 - 【逻辑联动】如果 `risk_triggered` 为 true，则 `risk_warning` 必须提供非空字符串。
+- 【评分约束】`score` 必须是 0 到 100 的整数。
 - 【默认兜底】如果没有发现明显的偏离项（no clear deviation），必须严格使用以下默认占位符：
   - "deviation_items": ["未发现明显偏离（建议人工复核）"]
   - "deviation_reasons": ["当前草稿未发现明显偏离项，建议人工复核语境和事实边界。"]
   - "suggestions": ["按当前方向继续优化表达，发布前做一次人工校对。"]
+  - "score": 85
 - 【语言要求】输出的 JSON Values 文本内容必须全部使用中文。
 - 【格式限制】不要输出任何 Markdown 格式符号（严禁使用 ```json 和 ``` 标签包裹内容），直接输出纯 JSON 字符串。
 """.strip()
@@ -82,21 +113,24 @@ Return strictly RAW JSON ONLY with the exact shape below:
   "deviation_reasons": ["string", "...at least 1 item"],
   "suggestions": ["string", "...at least 1 item"],
   "risk_triggered": boolean,
-  "risk_warning": "string"
+  "risk_warning": "string",
+  "score": 0
 }
 
 【Hard Constraints】
 1. [Schema 锁定]：必须且仅保留上述指定的 keys，严禁添加任何额外字段 (no extra keys)。
 2. [数组校验]：`deviation_items`、`deviation_reasons` 和 `suggestions` 这三个数组必须包含至少 1 个非空字符串。
 3. [风险联动]：当 `risk_triggered` 为 true 时，`risk_warning` 必须为非空字符串。
-4. [兜底占位符]：若未发现明显偏离 (if no clear deviation)，必须严格使用以下默认值：
+4. [评分约束]：`score` 必须为 0 到 100 的整数。
+5. [兜底占位符]：若未发现明显偏离 (if no clear deviation)，必须严格使用以下默认值：
    - "deviation_items": ["未发现明显偏离（建议人工复核）"]
    - "deviation_reasons": ["当前草稿未发现明显偏离项，建议人工复核语境和事实边界。"]
    - "suggestions": ["按当前方向继续优化表达，发布前做一次人工校对。"]
    - "risk_triggered": false
    - "risk_warning": ""
-5. [语言要求]：JSON 中的所有文本内容 (Values) 必须全部使用中文。
-6. [绝对无 Markdown]：直接输出纯粹的 JSON 字符串本体！严禁输出任何多余的解释，严禁使用 ``` 或 ```json 等代码块标签包裹。
+   - "score": 85
+6. [语言要求]：JSON 中的所有文本内容 (Values) 必须全部使用中文。
+7. [绝对无 Markdown]：直接输出纯粹的 JSON 字符串本体！严禁输出任何多余的解释，严禁使用 ``` 或 ```json 等代码块标签包裹。
 """.strip()
 
 
@@ -112,17 +146,21 @@ def _parse_consistency_output(payload: dict[str, Any]) -> _ConsistencyCheckOutpu
 
 
 def _validation_error_brief(error_message: str) -> str:
-    first_line = error_message.splitlines()[0] if error_message else "unknown"
+    if not error_message:
+        return "unknown"
+    non_empty_lines = [line.strip() for line in error_message.splitlines() if line.strip()]
+    first_line = non_empty_lines[0] if non_empty_lines else "unknown"
     return first_line[:200]
 
 
 def _build_degraded_output() -> _ConsistencyCheckOutput:
     return _ConsistencyCheckOutput(
         deviation_items=["未发现明显偏离（建议人工复核）"],
-        deviation_reasons=["LLM 结构化输出不稳定，已使用降级结果，请人工复核。"],
-        suggestions=["请人工复核草稿后再发布。"],
+        deviation_reasons=["一致性检查已降级：LLM 结构化输出不稳定，请人工复核。"],
+        suggestions=["请人工复核草稿后再发布，必要时可重新执行一致性检查。"],
         risk_triggered=False,
         risk_warning="",
+        score=60,
     )
 
 
@@ -227,6 +265,7 @@ def check_consistency(
     db.refresh(check)
     return ConsistencyCheckExecutionResult(
         check=check,
+        score=output.score,
         degraded=degraded,
         degrade_reason=degrade_reason,
         schema_repair_attempts=schema_repair_attempts,

@@ -169,6 +169,7 @@ def test_consistency_route_passes_expected_parameters(monkeypatch, tmp_path) -> 
             )
             return consistency_service.ConsistencyCheckExecutionResult(
                 check=check,
+                score=60,
                 degraded=True,
                 degrade_reason="llm_schema_retry_exhausted",
                 schema_repair_attempts=2,
@@ -189,6 +190,7 @@ def test_consistency_route_passes_expected_parameters(monkeypatch, tmp_path) -> 
         assert body["degraded"] is True
         assert body["degrade_reason"] == "llm_schema_retry_exhausted"
         assert body["schema_repair_attempts"] == 2
+        assert body["score"] == 60
         assert captured["user_id"] == user_id
         assert captured["identity_model_id"] == "identity-3"
         assert captured["constitution_id"] == "constitution-3"

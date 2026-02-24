@@ -354,6 +354,8 @@ def test_consistency_check_live_multi_scenarios(
         assert deviation_items
         assert deviation_reasons
         assert suggestions
+        assert isinstance(body["score"], int)
+        assert 0 <= body["score"] <= 100
         assert isinstance(body["degraded"], bool)
         assert isinstance(body["schema_repair_attempts"], int)
         assert 0 <= body["schema_repair_attempts"] <= 2

@@ -505,6 +505,7 @@ def test_check_consistency_persists_result(monkeypatch, tmp_path) -> None:
         "suggestions": ["suggestion-1"],
         "risk_triggered": True,
         "risk_warning": "warning",
+        "score": 88,
     }
     fake_client = _FakeLLMClient({"check_consistency": payload})
     monkeypatch.setattr(consistency_service, "get_llm_client", lambda: fake_client)
@@ -519,6 +520,7 @@ def test_check_consistency_persists_result(monkeypatch, tmp_path) -> None:
     assert check.id is not None
     assert check.risk_triggered is True
     assert check.risk_warning == "warning"
+    assert result.score == 88
     assert result.degraded is False
     assert result.degrade_reason is None
     assert result.schema_repair_attempts == 0
@@ -533,6 +535,7 @@ def test_check_consistency_retries_schema_then_succeeds(monkeypatch, tmp_path) -
         "suggestions": [],
         "risk_triggered": False,
         "risk_warning": "",
+        "score": 88,
     }
     valid_payload = {
         "deviation_items": ["item-1"],
@@ -540,6 +543,7 @@ def test_check_consistency_retries_schema_then_succeeds(monkeypatch, tmp_path) -
         "suggestions": ["suggestion-1"],
         "risk_triggered": False,
         "risk_warning": "",
+        "score": "76",
     }
     fake_client = _FakeLLMClient({"check_consistency": [invalid_payload, valid_payload]})
     monkeypatch.setattr(consistency_service, "get_llm_client", lambda: fake_client)
@@ -552,8 +556,68 @@ def test_check_consistency_retries_schema_then_succeeds(monkeypatch, tmp_path) -
     check = result.check
 
     assert check.id is not None
+    assert result.score == 76
     assert result.degraded is False
     assert result.degrade_reason is None
+    assert result.schema_repair_attempts == 1
+    assert len([c for c in fake_client.calls if c["operation"] == "check_consistency"]) == 2
+    _close_db(db)
+
+
+def test_check_consistency_accepts_decimal_string_score(monkeypatch, tmp_path) -> None:
+    db, user_id = _make_db_session(tmp_path)
+    payload = {
+        "deviation_items": ["item-1"],
+        "deviation_reasons": ["reason-1"],
+        "suggestions": ["suggestion-1"],
+        "risk_triggered": False,
+        "risk_warning": "",
+        "score": "70.0",
+    }
+    fake_client = _FakeLLMClient({"check_consistency": payload})
+    monkeypatch.setattr(consistency_service, "get_llm_client", lambda: fake_client)
+
+    result = consistency_service.check_consistency(
+        db=db,
+        user_id=user_id,
+        draft_text="a draft text",
+    )
+
+    assert result.score == 70
+    assert result.degraded is False
+    assert result.schema_repair_attempts == 0
+    _close_db(db)
+
+
+def test_check_consistency_retries_when_score_invalid_then_succeeds(monkeypatch, tmp_path) -> None:
+    db, user_id = _make_db_session(tmp_path)
+    invalid_payload = {
+        "deviation_items": ["item-1"],
+        "deviation_reasons": ["reason-1"],
+        "suggestions": ["suggestion-1"],
+        "risk_triggered": False,
+        "risk_warning": "",
+        "score": "70分",
+    }
+    valid_payload = {
+        "deviation_items": ["item-1"],
+        "deviation_reasons": ["reason-1"],
+        "suggestions": ["suggestion-1"],
+        "risk_triggered": False,
+        "risk_warning": "",
+        "score": 81,
+    }
+    fake_client = _FakeLLMClient({"check_consistency": [invalid_payload, valid_payload]})
+    monkeypatch.setattr(consistency_service, "get_llm_client", lambda: fake_client)
+
+    result = consistency_service.check_consistency(
+        db=db,
+        user_id=user_id,
+        draft_text="a draft text",
+    )
+
+    assert result.score == 81
+    assert result.degraded is False
     assert result.schema_repair_attempts == 1
     assert len([c for c in fake_client.calls if c["operation"] == "check_consistency"]) == 2
     _close_db(db)
@@ -567,6 +631,7 @@ def test_check_consistency_degrades_after_schema_retry_exhaustion(monkeypatch, t
         "suggestions": [],
         "risk_triggered": False,
         "risk_warning": "",
+        "score": "invalid",
     }
     fake_client = _FakeLLMClient(
         {"check_consistency": [invalid_payload, invalid_payload, invalid_payload]}
@@ -581,6 +646,7 @@ def test_check_consistency_degrades_after_schema_retry_exhaustion(monkeypatch, t
     check = result.check
 
     assert check.id is not None
+    assert result.score == 60
     assert result.degraded is True
     assert result.degrade_reason == consistency_service.DEGRADE_REASON_SCHEMA_RETRY_EXHAUSTED
     assert result.schema_repair_attempts == 2

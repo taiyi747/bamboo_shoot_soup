@@ -176,6 +176,7 @@ describe('createHttpApiClient', () => {
           deviation_reasons: ['原因1'],
           suggestions: '建议1',
           risk_warning: '触发风险边界',
+          score: 74,
         }
       }
       if (path === '/v1/events') {
@@ -246,7 +247,7 @@ describe('createHttpApiClient', () => {
     expect(check.result.deviations).toEqual(['偏离项1'])
     expect(check.result.reasons).toEqual(['原因1'])
     expect(check.result.suggestions).toEqual(['建议1'])
-    expect(check.result.score).toBeGreaterThan(0)
+    expect(check.result.score).toBe(74)
 
     await client.trackEvent({
       eventName: 'identity_selected',

@@ -49,6 +49,7 @@ def create_consistency_check(
             identity_model_id=body.identity_model_id,
             payload={
                 "risk_triggered": check.risk_triggered,
+                "score": result.score,
                 "degraded": result.degraded,
                 "degrade_reason": result.degrade_reason,
                 "schema_repair_attempts": result.schema_repair_attempts,
@@ -62,6 +63,7 @@ def create_consistency_check(
             "suggestions": check.suggestions_json,
             "risk_triggered": check.risk_triggered,
             "risk_warning": check.risk_warning,
+            "score": result.score,
             "degraded": result.degraded,
             "degrade_reason": result.degrade_reason,
             "schema_repair_attempts": result.schema_repair_attempts,

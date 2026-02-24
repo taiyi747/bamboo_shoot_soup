@@ -251,11 +251,6 @@ const parseGrowthArc = (raw: string): PersonaConstitution['growthArc'] => {
   })
 }
 
-const buildConsistencyScore = (deviations: string[], reasons: string[], riskWarning?: string): number => {
-  const riskPenalty = riskWarning ? 22 : 0
-  return Math.max(25, Math.min(100, 92 - deviations.length * 18 - reasons.length * 4 - riskPenalty))
-}
-
 const requestJson = async <T>(
   baseURL: string,
   path: string,
@@ -455,6 +450,7 @@ export const createHttpApiClient = (baseURL: string, getUserId: () => string): A
       deviation_reasons: unknown
       suggestions: unknown
       risk_warning?: string
+      score: unknown
     }>(baseURL, '/v1/consistency-checks', {
       method: 'POST',
       body: {
@@ -468,6 +464,10 @@ export const createHttpApiClient = (baseURL: string, getUserId: () => string): A
     const reasons = toStringArray(response.deviation_reasons)
     const suggestions = toStringArray(response.suggestions)
     const riskWarning = response.risk_warning?.trim() ? response.risk_warning : undefined
+    const parsedScore = Number(response.score)
+    if (!Number.isInteger(parsedScore) || parsedScore < 0 || parsedScore > 100) {
+      throw new Error('Invalid consistency score from backend.')
+    }
 
     return {
       result: {
@@ -475,7 +475,7 @@ export const createHttpApiClient = (baseURL: string, getUserId: () => string): A
         reasons,
         suggestions,
         riskWarning,
-        score: buildConsistencyScore(deviations, reasons, riskWarning),
+        score: parsedScore,
       },
     }
   },
