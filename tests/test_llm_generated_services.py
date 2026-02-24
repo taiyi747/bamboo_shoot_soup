@@ -147,6 +147,9 @@ def test_generate_identity_models_persists_count(monkeypatch, tmp_path) -> None:
 
     assert len(models) == 3
     assert all(model.differentiation for model in models)
+    prompt = fake_client.calls[0]["system_prompt"]
+    assert "risk_boundary must be a JSON array of non-empty strings, never a plain string." in prompt
+    assert "every models[i].risk_boundary is an array type" in prompt
     _close_db(db)
 
 

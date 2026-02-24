@@ -77,9 +77,13 @@ Hard constraints:
 - differentiation must be non-empty.
 - tone_examples must contain at least 5 entries.
 - long_term_views must contain 5-10 entries.
+- risk_boundary must be a JSON array of non-empty strings, never a plain string.
+- if only one risk boundary is generated, still return it as an array with one item.
 - no markdown, no prose, no extra keys.
+- self-check before returning:
+  - every models[i].risk_boundary is an array type
+  - every item in models[i].risk_boundary is a non-empty string
 """.strip()
-
 
 def _parse_identity_models(payload: dict[str, Any], count: int) -> list[_IdentityCandidate]:
     """校验 LLM 响应并强制候选数量与请求一致。"""
