@@ -9,7 +9,7 @@ This repository contains an MVP backend scaffold using FastAPI, SQLAlchemy, Alem
 ## Setup
 
 ```bash
-python -m pip install -e ".[dev]"
+uv sync
 ```
 
 Copy environment variables:

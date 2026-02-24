@@ -11,8 +11,8 @@
 
 默认运行模式：
 
-- API：`mock`
-- API Base：`http://127.0.0.1:8000`（`http` 模式下生效）
+- API：`http`
+- API Base：`http://127.0.0.1:8000`
 
 内部实现边界仍对齐 `docs/product-spec.md` 的 MVP 范围，但不在用户界面显式展示阶段标签。
 
@@ -43,17 +43,15 @@ bun run dev
 bun run dev:mobile
 ```
 
-## 切换 API 模式
+## 配置 API 地址
 
 新建或修改 `frontend/.env`：
 
 ```bash
-NUXT_PUBLIC_API_MODE=mock
 NUXT_PUBLIC_API_BASE=http://127.0.0.1:8000
 ```
 
-- `mock`：前端内置 Mock 数据（默认）
-- `http`：调用后端接口
+- 前端默认直连后端 `FastAPI`（`/v1/*`）
 
 ## 桌面端（Tauri）
 

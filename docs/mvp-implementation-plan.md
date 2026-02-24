@@ -55,14 +55,14 @@
 
 建议 API（MVP）：
 
-1. `POST /api/v1/onboarding/sessions`
-2. `POST /api/v1/onboarding/sessions/{session_id}/complete`
-3. `POST /api/v1/identity-models/generate`
-4. `POST /api/v1/identity-selections`
-5. `POST /api/v1/persona-constitutions/generate`
-6. `POST /api/v1/launch-kits/generate`
-7. `POST /api/v1/consistency-checks`
-8. `POST /api/v1/events`
+1. `POST /v1/onboarding/sessions`
+2. `POST /v1/onboarding/sessions/{session_id}/complete`
+3. `POST /v1/identity-models/generate`
+4. `POST /v1/identity-selections`
+5. `POST /v1/persona-constitutions/generate`
+6. `POST /v1/launch-kits/generate`
+7. `POST /v1/consistency-checks`
+8. `POST /v1/events`
 
 ### 4.2 Frontend（Tauri v2 + Nuxt 4）
 

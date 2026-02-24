@@ -1,17 +1,11 @@
 import { useApiClient } from '../services/api/client'
 import type { AnalyticsEventName, AnalyticsEventPayload } from '../types/flow'
-
-const buildUserId = () => {
-  if (globalThis.crypto?.randomUUID) {
-    return globalThis.crypto.randomUUID()
-  }
-  return `user_${Math.random().toString(36).slice(2, 10)}`
-}
+import { useStableUserId } from './useStableUserId'
 
 export const useAnalytics = () => {
   const { state } = useMvpFlow()
   const api = useApiClient()
-  const userId = useState<string>('mvp-user-id', buildUserId)
+  const userId = useStableUserId()
 
   const track = async (
     eventName: AnalyticsEventName,

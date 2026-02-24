@@ -1,15 +1,11 @@
 import { createHttpApiClient } from './http'
-import { mockApiClient } from './mock'
 import type { ApiClient } from './types'
+import { useStableUserId } from '../../composables/useStableUserId'
 
 export const useApiClient = (): ApiClient => {
   const config = useRuntimeConfig()
-  const mode = String(config.public.apiMode || 'mock').toLowerCase()
   const baseURL = String(config.public.apiBase || 'http://127.0.0.1:8000')
+  const userId = useStableUserId()
 
-  if (mode === 'http') {
-    return createHttpApiClient(baseURL)
-  }
-
-  return mockApiClient
+  return createHttpApiClient(baseURL, () => userId.value)
 }

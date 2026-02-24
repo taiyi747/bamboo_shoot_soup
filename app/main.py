@@ -1,6 +1,7 @@
 """FastAPI 应用入口与启动阶段校验。"""
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import v1_router
 from app.api.v1.health import router as health_router
@@ -12,6 +13,14 @@ settings = get_settings()
 app = FastAPI(
     title=settings.app_name,
     version="0.1.0",debug=True,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_allow_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(health_router)
