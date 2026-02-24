@@ -186,6 +186,9 @@ def test_generate_launch_kit_creates_7_days(monkeypatch, tmp_path) -> None:
     assert kit.id is not None
     assert len(kit.days) == 7
     assert [day.day_no for day in kit.days] == [1, 2, 3, 4, 5, 6, 7]
+    prompt = fake_client.calls[0]["system_prompt"]
+    assert "需要为创作者生成 7 天启动包 JSON" in prompt
+    assert "只返回严格 JSON 对象" in prompt
     _close_db(db)
 
 
@@ -304,6 +307,7 @@ def test_generate_launch_kit_retries_schema_then_succeeds(monkeypatch, tmp_path)
     assert kit.id is not None
     assert len(kit.days) == 7
     assert len([c for c in fake_client.calls if c["operation"] == "generate_launch_kit"]) == 2
+    assert "你正在修复一个不合法的 7 天启动包 JSON" in fake_client.calls[1]["system_prompt"]
     _close_db(db)
 
 

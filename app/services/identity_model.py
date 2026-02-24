@@ -111,13 +111,21 @@ def generate_identity_models(
     count: int = 3,
 ) -> list[IdentityModel]:
     """
-    Generate 3-5 identity models via LLM.
+    # 任务：生成人格模型
 
-    Per product-spec 2.6 business rules:
-    - differentiation must be non-empty
-    - tone_examples must have at least 5 sentences
-    - long_term_views must have 5-10 items
-    - monetization_validation_order must have at least 1 step
+    **任务目标：**
+    请生成 3-5 个不同的**人格模型（Identity Models）**。
+
+    **输出要求：**
+    所有生成的内容必须使用**中文**，且每个模型必须严格遵守产品说明书 2.6 的业务规则：
+
+    1. **差异化定位 (Differentiation)**：必须提供明确的定位说明，内容不得为空。
+    2. **语气示例 (Tone Examples)**：必须提供至少 5 句代表该人格说话风格的例句。
+    3. **长期愿景 (Long-term Views)**：必须列出 5-10 项具体的长期观点或发展目标。
+    4. **变现验证流程 (Monetization Validation Order)**：必须包含至少 1 个具体的变现验证步骤。
+
+    **输出格式：**
+    请使用清晰的 Markdown 结构（标题、列表等）输出每一个模型的信息。
     """
     llm_payload = {
         "user_id": user_id,

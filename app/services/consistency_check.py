@@ -50,50 +50,53 @@ class _ConsistencyCheckOutput(BaseModel):
 
 
 CONSISTENCY_CHECK_PROMPT = """
-
-You are evaluating content consistency against persona and identity constraints.
-Return strict JSON only with this shape:
+你正在修复一个用于一致性检查（consistency check）的无效 JSON 对象。
+请直接返回纯文本，且仅返回严格符合以下数据结构的 JSON（Return strict JSON only with this shape）：
 {
-  "deviation_items": ["string", "... at least 1 item"],
-  "deviation_reasons": ["string", "... at least 1 item"],
-  "suggestions": ["string", "... at least 1 item"],
-  "risk_triggered": true,
+  "deviation_items": ["string", "...至少 1 个元素"],
+  "deviation_reasons": ["string", "...至少 1 个元素"],
+  "suggestions": ["string", "...至少 1 个元素"],
+  "risk_triggered": boolean,
   "risk_warning": "string"
 }
-Hard constraints:
-- deviation_items must contain at least 1 non-empty string
-- deviation_reasons must contain at least 1 non-empty string
-- suggestions must contain at least 1 non-empty string
-- if risk_triggered is true, risk_warning must be non-empty
-- if there is no clear deviation, still return one placeholder item:
-  - deviation_items: ["未发现明显偏离（建议人工复核）"]
-  - deviation_reasons: ["当前草稿未发现明显偏离项，建议人工复核语境和事实边界。"]
-  - suggestions: ["按当前方向继续优化表达，发布前做一次人工校对。"]
-- no markdown
-- no extra keys
-- use chinese for all text
+
+强制约束条件（Hard constraints）：
+- 【结构锁定】必须完全保留上述指定的 Keys，绝对禁止添加任何额外的 Keys。
+- 【数组约束】所有三个数组（deviation_items, deviation_reasons, suggestions）必须包含至少 1 个非空字符串。
+- 【逻辑联动】如果 `risk_triggered` 为 true，则 `risk_warning` 必须提供非空字符串。
+- 【默认兜底】如果没有发现明显的偏离项（no clear deviation），必须严格使用以下默认占位符：
+  - "deviation_items": ["未发现明显偏离（建议人工复核）"]
+  - "deviation_reasons": ["当前草稿未发现明显偏离项，建议人工复核语境和事实边界。"]
+  - "suggestions": ["按当前方向继续优化表达，发布前做一次人工校对。"]
+- 【语言要求】输出的 JSON Values 文本内容必须全部使用中文。
+- 【格式限制】不要输出任何 Markdown 格式符号（严禁使用 ```json 和 ``` 标签包裹内容），直接输出纯 JSON 字符串。
 """.strip()
 
 CONSISTENCY_CHECK_REPAIR_PROMPT = """
-You are repairing an invalid JSON object for consistency check output.
-Return strict JSON only with this shape:
+你正在执行 consistency check（一致性检查）结果的修复任务，需将无效对象转换为格式合规的 JSON。
+
+【Output Requirement】
+Return strictly RAW JSON ONLY with the exact shape below:
 {
-  "deviation_items": ["string", "... at least 1 item"],
-  "deviation_reasons": ["string", "... at least 1 item"],
-  "suggestions": ["string", "... at least 1 item"],
-  "risk_triggered": true,
+  "deviation_items": ["string", "...at least 1 item"],
+  "deviation_reasons": ["string", "...at least 1 item"],
+  "suggestions": ["string", "...at least 1 item"],
+  "risk_triggered": boolean,
   "risk_warning": "string"
 }
-Hard constraints:
-- must keep exactly these keys and no extra keys
-- all three arrays must contain at least 1 non-empty string
-- if risk_triggered is true, risk_warning must be non-empty
-- if no clear deviation, use placeholder values:
-  - deviation_items: ["未发现明显偏离（建议人工复核）"]
-  - deviation_reasons: ["当前草稿未发现明显偏离项，建议人工复核语境和事实边界。"]
-  - suggestions: ["按当前方向继续优化表达，发布前做一次人工校对。"]
-- use chinese for all text
-- no markdown
+
+【Hard Constraints】
+1. [Schema 锁定]：必须且仅保留上述指定的 keys，严禁添加任何额外字段 (no extra keys)。
+2. [数组校验]：`deviation_items`、`deviation_reasons` 和 `suggestions` 这三个数组必须包含至少 1 个非空字符串。
+3. [风险联动]：当 `risk_triggered` 为 true 时，`risk_warning` 必须为非空字符串。
+4. [兜底占位符]：若未发现明显偏离 (if no clear deviation)，必须严格使用以下默认值：
+   - "deviation_items": ["未发现明显偏离（建议人工复核）"]
+   - "deviation_reasons": ["当前草稿未发现明显偏离项，建议人工复核语境和事实边界。"]
+   - "suggestions": ["按当前方向继续优化表达，发布前做一次人工校对。"]
+   - "risk_triggered": false
+   - "risk_warning": ""
+5. [语言要求]：JSON 中的所有文本内容 (Values) 必须全部使用中文。
+6. [绝对无 Markdown]：直接输出纯粹的 JSON 字符串本体！严禁输出任何多余的解释，严禁使用 ``` 或 ```json 等代码块标签包裹。
 """.strip()
 
 
