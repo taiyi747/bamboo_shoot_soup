@@ -246,22 +246,21 @@ const hasModels = computed(() => state.value.identityModels.length > 0)
             'ring-1 ring-slate-200 dark:ring-slate-800 hover:shadow-lg': selectedPrimaryId !== model.id && selectedBackupId !== model.id
           }"
         >
-          <div v-if="selectedPrimaryId === model.id" class="absolute -top-3 -right-3 badge-lg z-10">
-            <UBadge color="primary" size="lg" class="shadow-lg font-bold px-3 py-1">
-               <UIcon name="i-lucide-star" class="mr-1" /> 主身份
-            </UBadge>
-          </div>
-          <div v-if="selectedBackupId === model.id" class="absolute -top-3 -right-3 badge-lg z-10">
-            <UBadge color="success" variant="soft" size="lg" class="shadow-md font-bold px-3 py-1 ring-1 ring-emerald-300">
-               <UIcon name="i-lucide-shield-plus" class="mr-1" /> 备身份
-            </UBadge>
-          </div>
-
           <template #header>
-            <div class="flex items-start justify-between">
-              <h3 class="text-lg font-bold text-slate-900 dark:text-white leading-tight">
+            <div class="flex items-start justify-between gap-3">
+              <h3 class="min-w-0 text-lg font-bold text-slate-900 dark:text-white leading-tight break-words">
                 {{ model.title }}
               </h3>
+              <div v-if="selectedPrimaryId === model.id" data-testid="identity-card-primary-badge" class="shrink-0">
+                <UBadge color="primary" size="lg" class="shadow-lg font-bold px-3 py-1">
+                   <UIcon name="i-lucide-star" class="mr-1" /> 主身份
+                </UBadge>
+              </div>
+              <div v-else-if="selectedBackupId === model.id" data-testid="identity-card-backup-badge" class="shrink-0">
+                <UBadge color="success" variant="soft" size="lg" class="shadow-md font-bold px-3 py-1 ring-1 ring-emerald-300">
+                   <UIcon name="i-lucide-shield-plus" class="mr-1" /> 备身份
+                </UBadge>
+              </div>
             </div>
           </template>
 
