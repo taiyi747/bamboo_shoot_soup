@@ -125,7 +125,7 @@ class LLMClient:
         self._openai = openai
         self._model_name = settings.model_name or ""
         self._max_retries = settings.openai_max_retries
-        self._reasoning = settings.reasoning
+        self._reason = settings.reason
         self._client = OpenAI(
             api_key=settings.openai_api_key,
             base_url=normalize_openai_base_url(settings.openai_base_url or ""),
@@ -221,7 +221,7 @@ class LLMClient:
         self,
         *,
         messages: list[dict[str, str]],
-        include_reasoning: bool,
+        include_reason: bool,
     ) -> dict[str, Any]:
         request: dict[str, Any] = {
             "model": self._model_name,
@@ -230,10 +230,11 @@ class LLMClient:
             "response_format": {"type": "json_object"},
             "temperature": 0.2,
         }
-        if include_reasoning and self._reasoning is not None:
-            extra_body: dict[str, Any] = {"reasoning": self._reasoning}
-            # Some OpenAI-compatible gateways require this switch to truly disable thinking.
-            if self._reasoning is False:
+        if include_reason and self._reason is not None:
+            extra_body: dict[str, Any] = {"easoning": self._reason}
+            # For many OpenAI-compatible gateways, reason=false alone does not
+            # disable reasoning, while enable_thinking=false does.
+            if self._reason is False:
                 extra_body["enable_thinking"] = False
             request["extra_body"] = extra_body
         return request
@@ -243,11 +244,11 @@ class LLMClient:
         *,
         operation: str,
         messages: list[dict[str, str]],
-        include_reasoning: bool,
+        include_reason: bool,
     ) -> Any:
         request = self._build_completion_request(
             messages=messages,
-            include_reasoning=include_reasoning,
+            include_reason=include_reason,
         )
         try:
             return self._client.chat.completions.create(**request)
@@ -295,23 +296,23 @@ class LLMClient:
         operation: str,
         messages: list[dict[str, str]],
     ) -> Any:
-        include_reasoning = self._reasoning is not None
+        include_reason = self._reason is not None
         try:
             return self._create_completion(
                 operation=operation,
                 messages=messages,
-                include_reasoning=include_reasoning,
+                include_reason=include_reason,
             )
         except LLMServiceError as error:
             if (
-                include_reasoning
+                include_reason
                 and error.code == "LLM_UPSTREAM_HTTP_ERROR"
                 and error.provider_status in {400, 422}
             ):
                 return self._create_completion(
                     operation=operation,
                     messages=messages,
-                    include_reasoning=False,
+                    include_reason=False,
                 )
             raise
 
