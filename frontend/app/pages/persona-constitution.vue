@@ -152,22 +152,22 @@ if (state.value.persona) {
 
       <div v-else class="space-y-6 lg:space-y-8">
         <div class="grid gap-6 md:grid-cols-2 lg:gap-8">
-          <UFormField label="口吻词典：常用词 (Common Words)" name="commonWords" class="w-full">
+          <UFormField label="口吻词典：常用词" name="commonWords" class="w-full">
             <template #description><span class="text-xs text-emerald-600 dark:text-emerald-400">强化你的身份特质的积极词汇（每行一个）</span></template>
             <UTextarea v-model="form.commonWords" :rows="5" class="w-full touch-target transition-shadow focus:ring-primary-500 font-mono text-sm" />
           </UFormField>
           
-          <UFormField label="口吻词典：禁用词 (Forbidden Words)" name="forbiddenWords" class="w-full">
+          <UFormField label="口吻词典：禁用词" name="forbiddenWords" class="w-full">
             <template #description><span class="text-xs text-rose-500 dark:text-rose-400">绝对不能说、会破坏人设的词汇（每行一个）</span></template>
             <UTextarea v-model="form.forbiddenWords" :rows="5" class="w-full touch-target transition-shadow focus:ring-rose-500 font-mono text-sm border-rose-100 dark:border-rose-900/50" />
           </UFormField>
           
-          <UFormField label="句式偏好 (Sentence Preferences)" name="sentencePreferences" class="w-full">
+          <UFormField label="句式偏好" name="sentencePreferences" class="w-full">
              <template #description><span class="text-xs text-slate-500">你的招牌说话方式，如排比、问句等（每行一个）</span></template>
             <UTextarea v-model="form.sentencePreferences" :rows="5" class="w-full touch-target font-mono text-sm" />
           </UFormField>
           
-          <UFormField label="观点护城河 (Immutable Positions)" name="immutablePositions" class="w-full">
+          <UFormField label="观点护城河" name="immutablePositions" class="w-full">
              <template #description><span class="text-xs text-amber-600 dark:text-amber-500">即使掉粉也绝对不能动摇的强观点（每行一个）</span></template>
             <UTextarea v-model="form.immutablePositions" :rows="5" class="w-full touch-target font-mono text-sm" />
           </UFormField>
@@ -179,11 +179,11 @@ if (state.value.persona) {
             <h3 class="font-bold text-slate-900 dark:text-white">叙事与成长路径</h3>
           </div>
           
-          <UFormField label="叙事主线 (Narrative Mainline)" class="w-full">
+          <UFormField label="叙事主线" class="w-full">
             <UTextarea v-model="form.narrativeMainline" :rows="3" class="w-full touch-target text-sm" />
           </UFormField>
           
-          <UFormField label="成长 Arc (Growth Arc)" class="w-full">
+          <UFormField label="成长 Arc" class="w-full">
             <template #description><span class="text-xs text-slate-500">格式：阶段：模板，每行一个</span></template>
             <UTextarea v-model="form.growthArc" :rows="4" class="w-full touch-target font-mono text-sm" />
           </UFormField>

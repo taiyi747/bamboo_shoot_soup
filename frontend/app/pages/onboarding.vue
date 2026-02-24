@@ -94,7 +94,7 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
               身份诊断
             </h2>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-              我们将通过六个维度全面剖析你的能力画像，帮助定位最适合 שלך 的创作者身份模型。
+              我们将通过六个维度全面剖析你的能力画像，帮助定位最适合你的创作者身份模型。
             </p>
           </div>
         </div>
