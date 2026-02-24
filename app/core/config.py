@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     """集中管理后端运行时配置。"""
 
     app_name: str = "Bamboo Shoot Soup Backend"
+    debug: bool = False
     database_url: str = "sqlite:///./data/bss.db"
     cors_allow_origins: list[str] = Field(
         default_factory=lambda: [

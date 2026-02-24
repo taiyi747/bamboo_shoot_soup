@@ -12,7 +12,8 @@ import app.models  # noqa: F401
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # Keep uvicorn loggers alive when Alembic runs inside app startup.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 settings = get_settings()
 configured_url = config.get_main_option("sqlalchemy.url")

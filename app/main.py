@@ -13,7 +13,8 @@ settings = get_settings()
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.1.0",debug=True,
+    version="0.1.0",
+    debug=settings.debug,
 )
 
 app.add_middleware(

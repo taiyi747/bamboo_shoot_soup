@@ -64,3 +64,13 @@ def test_cors_allow_origins_accepts_json_and_csv_formats() -> None:
         "http://127.0.0.1:3000",
         "http://localhost:3000",
     ]
+
+
+def test_debug_flag_defaults_false_and_supports_boolean_strings() -> None:
+    default_settings = Settings(_env_file=None)
+    enabled_settings = Settings(_env_file=None, debug="true")
+    disabled_settings = Settings(_env_file=None, debug="false")
+
+    assert default_settings.debug is False
+    assert enabled_settings.debug is True
+    assert disabled_settings.debug is False
