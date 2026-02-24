@@ -1,6 +1,7 @@
 <script setup lang="ts">
 const route = useRoute()
 const { state } = useMvpFlow()
+const stepNavRef = ref<HTMLElement | null>(null)
 
 const steps = [
   { to: '/onboarding', label: '身份诊断', icon: 'i-lucide-clipboard-list' },
@@ -30,6 +31,40 @@ const isDark = computed({
     colorMode.preference = colorMode.value === 'dark' ? 'light' : 'dark'
   }
 })
+
+const scrollActiveStepIntoView = () => {
+  if (!stepNavRef.value) {
+    return
+  }
+
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return
+  }
+
+  if (!window.matchMedia('(max-width: 640px)').matches) {
+    return
+  }
+
+  const activeStep = stepNavRef.value.querySelector<HTMLElement>('[data-active-step="true"]')
+  activeStep?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'nearest',
+    inline: 'center',
+  })
+}
+
+onMounted(() => {
+  scrollActiveStepIntoView()
+})
+
+watch(
+  () => route.path,
+  () => {
+    nextTick(() => {
+      scrollActiveStepIntoView()
+    })
+  }
+)
 </script>
 
 <template>
@@ -53,24 +88,26 @@ const isDark = computed({
           :icon="isDark ? 'i-lucide-moon' : 'i-lucide-sun'"
           color="neutral"
           variant="ghost"
-          class="self-end sm:self-auto rounded-full"
+          class="hidden sm:inline-flex self-end sm:self-auto rounded-full"
           @click="isDark = !isDark"
           aria-label="Toggle color mode"
         />
       </div>
 
-      <nav class="step-nav">
+      <nav ref="stepNavRef" class="step-nav" data-testid="mvp-step-nav">
         <NuxtLink
           v-for="step in steps"
           :key="step.to"
           :to="canVisit(step.to) ? step.to : route.path"
-          class="block"
+          class="step-nav-link"
+          :data-active-step="String(route.path === step.to)"
         >
           <UButton
             :color="route.path === step.to ? 'primary' : 'neutral'"
             :variant="route.path === step.to ? 'soft' : 'ghost'"
             :icon="step.icon"
-            class="touch-target w-full justify-start font-medium transition-all duration-200"
+            size="sm"
+            class="step-nav-button touch-target w-full justify-center sm:justify-start font-medium transition-all duration-200"
             :class="[route.path === step.to ? 'ring-1 ring-primary-500/20 shadow-sm' : 'opacity-70 hover:opacity-100']"
             :disabled="!canVisit(step.to)"
           >
