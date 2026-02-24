@@ -9,19 +9,13 @@ This repository contains an MVP backend scaffold using FastAPI, SQLAlchemy, Alem
 ## Setup
 
 ```bash
-python -m pip install -e ".[dev]"
+uv sync
 ```
 
 Copy environment variables:
 
 ```bash
 cp .env.example .env
-```
-
-Optional CORS override (comma-separated):
-
-```bash
-CORS_ALLOW_ORIGINS=http://127.0.0.1:3000,http://localhost:3000
 ```
 
 ## Run API
