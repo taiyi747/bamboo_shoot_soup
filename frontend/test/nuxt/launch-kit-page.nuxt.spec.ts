@@ -56,6 +56,7 @@ const createFlowState = (): MvpFlowState => ({
     goals: [],
   },
   identityModels: [primaryModel],
+  experiments: [],
   selectedPrimaryId: primaryModel.id,
   persona,
   draftToCheck: '',

@@ -32,6 +32,9 @@ from app.schemas.event_log import (
     EventLogCreate,
     EventLogResponse,
 )
+from app.schemas.content_matrix import ContentMatrixGenerate, ContentMatrixResponse
+from app.schemas.experiment import ExperimentCreate, ExperimentResponse, ExperimentResultUpdate
+from app.schemas.monetization_map import MonetizationMapGenerate, MonetizationMapResponse
 from app.schemas.user import UserResponse
 
 __all__ = [
@@ -55,5 +58,12 @@ __all__ = [
     "ConsistencyCheckResponse",
     "EventLogCreate",
     "EventLogResponse",
+    "ContentMatrixGenerate",
+    "ContentMatrixResponse",
+    "ExperimentCreate",
+    "ExperimentResponse",
+    "ExperimentResultUpdate",
+    "MonetizationMapGenerate",
+    "MonetizationMapResponse",
     "UserResponse",
 ]

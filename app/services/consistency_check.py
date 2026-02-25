@@ -12,6 +12,11 @@ from sqlalchemy.orm import Session
 
 from app.models.consistency_check import ConsistencyCheck
 from app.services.llm_client import LLMServiceError, get_llm_client, llm_schema_error
+from app.services.llm_replay import (
+    DEGRADE_REASON_REPLAY_FALLBACK,
+    generate_json_with_replay,
+    load_latest_replay_payload,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -128,23 +133,34 @@ def _build_degraded_output() -> _ConsistencyCheckOutput:
 
 def _generate_consistency_output(
     *,
+    db: Session,
+    user_id: str,
     llm_payload: dict[str, Any],
 ) -> tuple[_ConsistencyCheckOutput, bool, str | None, int]:
-    llm_client = get_llm_client()
-    response_payload = llm_client.generate_json(
+    response_result = generate_json_with_replay(
+        db,
+        user_id=user_id,
         operation="check_consistency",
         system_prompt=CONSISTENCY_CHECK_PROMPT,
         user_payload=llm_payload,
+        llm_client=get_llm_client(),
     )
 
     try:
-        return _parse_consistency_output(response_payload), False, None, 0
+        return (
+            _parse_consistency_output(response_result.payload),
+            response_result.degraded,
+            response_result.degrade_reason,
+            0,
+        )
     except LLMServiceError as exc:
         if exc.code != "LLM_SCHEMA_VALIDATION_FAILED":
             raise
         last_error = exc
 
-    last_payload = response_payload
+    last_payload = response_result.payload
+    degraded = response_result.degraded
+    degrade_reason = response_result.degrade_reason
     for attempt in range(1, SCHEMA_REPAIR_MAX_RETRIES + 1):
         logger.warning(
             "schema_retry operation=check_consistency schema_retry_attempt=%s validation_error_brief=%s degraded=%s",
@@ -158,19 +174,44 @@ def _generate_consistency_output(
             "previous_invalid_response": last_payload,
             "validation_error": last_error.message,
         }
-        repaired_payload = llm_client.generate_json(
+        repaired_result = generate_json_with_replay(
+            db,
+            user_id=user_id,
             operation="check_consistency",
             system_prompt=CONSISTENCY_CHECK_REPAIR_PROMPT,
             user_payload=repair_payload,
+            llm_client=get_llm_client(),
         )
+        repaired_payload = repaired_result.payload
         try:
             output = _parse_consistency_output(repaired_payload)
-            return output, False, None, attempt
+            return (
+                output,
+                degraded or repaired_result.degraded,
+                degrade_reason or repaired_result.degrade_reason,
+                attempt,
+            )
         except LLMServiceError as exc:
             if exc.code != "LLM_SCHEMA_VALIDATION_FAILED":
                 raise
             last_error = exc
             last_payload = repaired_payload
+
+    fallback_payload = load_latest_replay_payload(
+        db,
+        user_id=user_id,
+        operation="check_consistency",
+    )
+    if fallback_payload is not None:
+        try:
+            return (
+                _parse_consistency_output(fallback_payload),
+                True,
+                DEGRADE_REASON_REPLAY_FALLBACK,
+                SCHEMA_REPAIR_MAX_RETRIES,
+            )
+        except LLMServiceError:
+            pass
 
     logger.warning(
         "schema_retry operation=check_consistency schema_retry_attempt=%s validation_error_brief=%s degraded=%s",
@@ -207,6 +248,8 @@ def check_consistency(
         "draft_text": draft_text,
     }
     output, degraded, degrade_reason, schema_repair_attempts = _generate_consistency_output(
+        db=db,
+        user_id=user_id,
         llm_payload=llm_payload
     )
 

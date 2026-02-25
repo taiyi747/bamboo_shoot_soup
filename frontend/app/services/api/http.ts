@@ -1,4 +1,13 @@
-import type { IdentityModelCard, LaunchKit, OnboardingProfile, PersonaConstitution, RiskTolerance } from '../../types/flow'
+import type {
+  ContentMatrix,
+  ExperimentRecord,
+  IdentityModelCard,
+  LaunchKit,
+  MonetizationMap,
+  OnboardingProfile,
+  PersonaConstitution,
+  RiskTolerance,
+} from '../../types/flow'
 import type { ApiClient } from './types'
 
 type Dict = Record<string, unknown>
@@ -47,6 +56,26 @@ interface LaunchKitDto {
   days: LaunchKitDayDto[]
   sustainable_columns_json: unknown
   growth_experiment_suggestion_json: unknown
+}
+
+interface ContentMatrixDto {
+  matrix_json: unknown
+}
+
+interface ExperimentDto {
+  id: string
+  hypothesis: string
+  variables_json: unknown
+  execution_cycle: string
+  result: string
+  conclusion: string
+  status: string
+}
+
+interface MonetizationMapDto {
+  primary_path: string
+  backup_path: string
+  weeks_json: unknown
 }
 
 const toErrorMessage = (data: unknown): string => {
@@ -259,7 +288,7 @@ const buildConsistencyScore = (deviations: string[], reasons: string[], riskWarn
 const requestJson = async <T>(
   baseURL: string,
   path: string,
-  options?: { method?: 'GET' | 'POST'; body?: unknown }
+  options?: { method?: 'GET' | 'POST' | 'PATCH'; body?: unknown }
 ): Promise<T> => {
   try {
     return await $fetch<T>(path, {
@@ -333,6 +362,66 @@ const mapLaunchKit = (dto: LaunchKitDto): LaunchKit => {
       executionCycle: String(growthExperiment.duration || growthExperiment.execution_cycle || ''),
       successMetric: String(growthExperiment.success_metric || growthExperiment.successMetric || ''),
     },
+  }
+}
+
+const mapContentMatrix = (dto: ContentMatrixDto): ContentMatrix => {
+  const pillars = parseJsonArray(dto.matrix_json)
+    .map(item => {
+      if (!item || typeof item !== 'object') {
+        return null
+      }
+      const dict = item as Dict
+      const platformRewrites: Record<string, string[]> = {}
+      const rewritesRaw = dict.platform_rewrites
+      if (rewritesRaw && typeof rewritesRaw === 'object' && !Array.isArray(rewritesRaw)) {
+        for (const [platform, values] of Object.entries(rewritesRaw as Dict)) {
+          platformRewrites[platform] = toStringArray(values)
+        }
+      }
+
+      return {
+        pillar: String(dict.pillar || ''),
+        topics: toStringArray(dict.topics),
+        platformRewrites,
+      }
+    })
+    .filter((item): item is ContentMatrix['pillars'][number] => Boolean(item?.pillar))
+
+  return { pillars }
+}
+
+const mapExperiment = (dto: ExperimentDto): ExperimentRecord => ({
+  id: dto.id,
+  hypothesis: dto.hypothesis || '',
+  variables: toStringArray(dto.variables_json),
+  executionCycle: dto.execution_cycle || '',
+  result: dto.result || '',
+  conclusion: dto.conclusion || '',
+  status: dto.status === 'completed' ? 'completed' : 'planned',
+})
+
+const mapMonetizationMap = (dto: MonetizationMapDto): MonetizationMap => {
+  const weeks = parseJsonArray(dto.weeks_json)
+    .map(item => {
+      if (!item || typeof item !== 'object') {
+        return null
+      }
+      const dict = item as Dict
+      return {
+        weekNo: Number(dict.week_no || 0),
+        goal: String(dict.goal || ''),
+        task: String(dict.task || ''),
+        deliverable: String(dict.deliverable || ''),
+        validationMetric: String(dict.validation_metric || ''),
+      }
+    })
+    .filter((item): item is MonetizationMap['weeks'][number] => Boolean(item && item.weekNo > 0))
+
+  return {
+    primaryPath: dto.primary_path || '',
+    backupPath: dto.backup_path || '',
+    weeks,
   }
 }
 
@@ -447,6 +536,88 @@ export const createHttpApiClient = (baseURL: string, getUserId: () => string): A
     })
 
     return { launchKit: mapLaunchKit(launchKit) }
+  },
+
+  async generateContentMatrix(input) {
+    const created = await requestJson<{ id: string }>(baseURL, '/v1/content-matrices/generate', {
+      method: 'POST',
+      body: {
+        user_id: getUserId(),
+        identity_model_id: input.identityModel.id,
+      },
+    })
+
+    const matrix = await requestJson<ContentMatrixDto>(baseURL, `/v1/content-matrices/${created.id}`, {
+      method: 'GET',
+    })
+
+    return { contentMatrix: mapContentMatrix(matrix) }
+  },
+
+  async getContentMatrices() {
+    const matrices = await requestJson<ContentMatrixDto[]>(
+      baseURL,
+      `/v1/content-matrices/users/${getUserId()}`,
+      { method: 'GET' }
+    )
+    return { matrices: matrices.map(mapContentMatrix) }
+  },
+
+  async createExperiment(input) {
+    const created = await requestJson<{ id: string }>(baseURL, '/v1/experiments', {
+      method: 'POST',
+      body: {
+        user_id: getUserId(),
+        identity_model_id: input.identityModel.id,
+        hypothesis: input.hypothesis,
+        variables: input.variables,
+        execution_cycle: input.executionCycle,
+      },
+    })
+    return { experimentId: created.id }
+  },
+
+  async updateExperimentResult(input) {
+    await requestJson(baseURL, `/v1/experiments/${input.experimentId}/result`, {
+      method: 'PATCH',
+      body: {
+        result: input.result,
+        conclusion: input.conclusion,
+      },
+    })
+    return { updated: true as const }
+  },
+
+  async getExperiments() {
+    const experiments = await requestJson<ExperimentDto[]>(baseURL, `/v1/experiments/users/${getUserId()}`, {
+      method: 'GET',
+    })
+    return { experiments: experiments.map(mapExperiment) }
+  },
+
+  async generateMonetizationMap(input) {
+    const created = await requestJson<{ id: string }>(baseURL, '/v1/monetization-maps/generate', {
+      method: 'POST',
+      body: {
+        user_id: getUserId(),
+        identity_model_id: input.identityModel.id,
+      },
+    })
+
+    const map = await requestJson<MonetizationMapDto>(baseURL, `/v1/monetization-maps/${created.id}`, {
+      method: 'GET',
+    })
+
+    return { monetizationMap: mapMonetizationMap(map) }
+  },
+
+  async getMonetizationMaps() {
+    const maps = await requestJson<MonetizationMapDto[]>(
+      baseURL,
+      `/v1/monetization-maps/users/${getUserId()}`,
+      { method: 'GET' }
+    )
+    return { maps: maps.map(mapMonetizationMap) }
   },
 
   async runConsistencyCheck(input) {

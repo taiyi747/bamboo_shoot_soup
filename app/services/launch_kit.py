@@ -14,6 +14,11 @@ from app.models.launch_kit import LaunchKit, LaunchKitDay
 from app.models.onboarding import CapabilityProfile
 from app.models.persona import PersonaConstitution, RiskBoundaryItem
 from app.services.llm_client import LLMServiceError, get_llm_client, llm_schema_error
+from app.services.llm_replay import (
+    DEGRADE_REASON_REPLAY_FALLBACK,
+    generate_json_with_replay,
+    load_latest_replay_payload,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -532,22 +537,31 @@ def _resolve_context_bundle(
     )
 
 
-def _generate_launch_kit_output(*, llm_payload: dict[str, Any]) -> tuple[_LaunchKitOutput, int]:
-    llm_client = get_llm_client()
-    response_payload = llm_client.generate_json(
+def _generate_launch_kit_output(
+    *,
+    db: Session,
+    user_id: str,
+    llm_payload: dict[str, Any],
+) -> tuple[_LaunchKitOutput, int, bool, str | None]:
+    replay_result = generate_json_with_replay(
+        db,
+        user_id=user_id,
         operation="generate_launch_kit",
         system_prompt=LAUNCH_KIT_PROMPT,
         user_payload=llm_payload,
+        llm_client=get_llm_client(),
     )
 
     try:
-        return _parse_launch_kit(response_payload), 0
+        return _parse_launch_kit(replay_result.payload), 0, replay_result.degraded, replay_result.degrade_reason
     except LLMServiceError as exc:
         if exc.code != "LLM_SCHEMA_VALIDATION_FAILED":
             raise
         last_error = exc
 
-    last_payload = response_payload
+    last_payload = replay_result.payload
+    degraded = replay_result.degraded
+    degrade_reason = replay_result.degrade_reason
     for attempt in range(1, SCHEMA_REPAIR_MAX_RETRIES + 1):
         logger.warning(
             "schema_retry operation=generate_launch_kit schema_retry_attempt=%s validation_error_brief=%s degraded=%s",
@@ -560,18 +574,43 @@ def _generate_launch_kit_output(*, llm_payload: dict[str, Any]) -> tuple[_Launch
             "previous_invalid_response": last_payload,
             "validation_error": last_error.message,
         }
-        repaired_payload = llm_client.generate_json(
+        repaired_result = generate_json_with_replay(
+            db,
+            user_id=user_id,
             operation="generate_launch_kit",
             system_prompt=LAUNCH_KIT_REPAIR_PROMPT,
             user_payload=repair_payload,
+            llm_client=get_llm_client(),
         )
+        repaired_payload = repaired_result.payload
         try:
-            return _parse_launch_kit(repaired_payload), attempt
+            return (
+                _parse_launch_kit(repaired_payload),
+                attempt,
+                degraded or repaired_result.degraded,
+                degrade_reason or repaired_result.degrade_reason,
+            )
         except LLMServiceError as exc:
             if exc.code != "LLM_SCHEMA_VALIDATION_FAILED":
                 raise
             last_error = exc
             last_payload = repaired_payload
+
+    fallback_payload = load_latest_replay_payload(
+        db,
+        user_id=user_id,
+        operation="generate_launch_kit",
+    )
+    if fallback_payload is not None:
+        try:
+            return (
+                _parse_launch_kit(fallback_payload),
+                SCHEMA_REPAIR_MAX_RETRIES,
+                True,
+                DEGRADE_REASON_REPLAY_FALLBACK,
+            )
+        except LLMServiceError:
+            pass
 
     raise llm_schema_error(
         "generate_launch_kit",
@@ -595,6 +634,8 @@ def generate_launch_kit(
     context_resolve_ms = 0
     llm_generate_ms = 0
     schema_repair_attempts = 0
+    degraded = False
+    degrade_reason: str | None = None
     context_sources = {
         "identity_model_source": "none",
         "persona_constitution_source": "none",
@@ -623,7 +664,11 @@ def generate_launch_kit(
         }
 
         llm_start = time.perf_counter()
-        output, schema_repair_attempts = _generate_launch_kit_output(llm_payload=llm_payload)
+        output, schema_repair_attempts, degraded, degrade_reason = _generate_launch_kit_output(
+            db=db,
+            user_id=user_id,
+            llm_payload=llm_payload,
+        )
         llm_generate_ms = int((time.perf_counter() - llm_start) * 1000)
 
         kit = LaunchKit(
@@ -655,11 +700,13 @@ def generate_launch_kit(
     finally:
         total_ms = int((time.perf_counter() - total_start) * 1000)
         logger.info(
-            "launch_kit_generation_metrics user_id=%s context_resolve_ms=%s llm_generate_ms=%s schema_repair_attempts=%s total_ms=%s context_sources=%s",
+            "launch_kit_generation_metrics user_id=%s context_resolve_ms=%s llm_generate_ms=%s schema_repair_attempts=%s degraded=%s degrade_reason=%s total_ms=%s context_sources=%s",
             user_id,
             context_resolve_ms,
             llm_generate_ms,
             schema_repair_attempts,
+            degraded,
+            degrade_reason,
             total_ms,
             json.dumps(context_sources, ensure_ascii=False, sort_keys=True),
         )

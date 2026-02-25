@@ -7,7 +7,13 @@ export interface GenerationFeedbackCopy {
 }
 
 export const generationFeedbackCopy: Record<
-  'onboarding' | 'identityModels' | 'personaConstitution' | 'launchKit' | 'consistencyCheck',
+  | 'onboarding'
+  | 'identityModels'
+  | 'personaConstitution'
+  | 'launchKit'
+  | 'consistencyCheck'
+  | 'contentMatrix'
+  | 'monetizationMap',
   GenerationFeedbackCopy
 > = {
   onboarding: {
@@ -43,6 +49,20 @@ export const generationFeedbackCopy: Record<
     description: 'Agent 正在对照人格宪法识别偏离项并给出改写建议。',
     hints: ['正在扫描语气与立场偏离...', '正在定位潜在风险边界...', '正在整理可执行修改建议...'],
     icon: 'i-lucide-check-circle',
+    color: 'info',
+  },
+  contentMatrix: {
+    title: '正在生成内容矩阵',
+    description: 'Agent 正在扩展内容支柱选题并输出多平台改写方向。',
+    hints: ['正在扩展每个内容支柱的选题库...', '正在生成平台改写角度...', '正在整理可执行内容矩阵...'],
+    icon: 'i-lucide-grid-2x2',
+    color: 'primary',
+  },
+  monetizationMap: {
+    title: '正在生成变现路线图',
+    description: 'Agent 正在编排 12 周任务、交付物与验证指标。',
+    hints: ['正在拆解 12 周验证节奏...', '正在匹配主路径与备选路径...', '正在生成每周验证指标...'],
+    icon: 'i-lucide-trending-up',
     color: 'info',
   },
 }

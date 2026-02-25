@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     reason: bool | None = None
     openai_timeout_seconds: float = Field(default=90.0, gt=0)
     openai_max_retries: int = Field(default=2, ge=0)
+    demo_replay_fallback_enabled: bool = True
+    demo_replay_force: bool = False
 
     @field_validator("cors_allow_origins", mode="before")
     @classmethod

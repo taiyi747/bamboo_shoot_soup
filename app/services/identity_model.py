@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
 import json
 from typing import Any
 
@@ -13,7 +12,8 @@ from app.models.consistency_check import ConsistencyCheck
 from app.models.identity_model import IdentityModel, IdentitySelection
 from app.models.launch_kit import LaunchKit
 from app.models.persona import PersonaConstitution, RiskBoundaryItem
-from app.services.llm_client import get_llm_client, llm_schema_error
+from app.services.llm_client import LLMServiceError, get_llm_client, llm_schema_error
+from app.services.llm_replay import generate_json_with_replay, load_latest_replay_payload
 
 
 class _IdentityCandidate(BaseModel):
@@ -113,24 +113,40 @@ def _parse_identity_models(payload: dict[str, Any], count: int) -> list[_Identit
 
 def _generate_identity_candidates_parallel(
     *,
+    db: Session,
+    user_id: str,
     count: int,
     llm_payload: dict[str, Any],
 ) -> list[_IdentityCandidate]:
-    """Generate candidates in parallel, one candidate per request."""
+    """Generate candidates one-by-one to keep replay fallback deterministic."""
 
     def _generate_one(_index: int) -> _IdentityCandidate:
         payload = dict(llm_payload)
         payload["count"] = 1
-        response_payload = get_llm_client().generate_json(
+        replay_result = generate_json_with_replay(
+            db,
+            user_id=user_id,
             operation="generate_identity_models",
             system_prompt=IDENTITY_MODELS_PROMPT,
             user_payload=payload,
+            llm_client=get_llm_client(),
         )
-        candidates = _parse_identity_models(response_payload, count=1)
+        try:
+            candidates = _parse_identity_models(replay_result.payload, count=1)
+        except LLMServiceError as error:
+            if error.code != "LLM_SCHEMA_VALIDATION_FAILED":
+                raise
+            fallback_payload = load_latest_replay_payload(
+                db,
+                user_id=user_id,
+                operation="generate_identity_models",
+            )
+            if fallback_payload is None:
+                raise
+            candidates = _parse_identity_models(fallback_payload, count=1)
         return candidates[0]
 
-    with ThreadPoolExecutor(max_workers=count) as executor:
-        return list(executor.map(_generate_one, range(count)))
+    return [_generate_one(index) for index in range(count)]
 
 
 def _replace_user_identity_models(db: Session, user_id: str) -> None:
@@ -191,7 +207,12 @@ def generate_identity_models(
         "capability_profile": capability_profile,
     }
 
-    candidates = _generate_identity_candidates_parallel(count=count, llm_payload=llm_payload)
+    candidates = _generate_identity_candidates_parallel(
+        db=db,
+        user_id=user_id,
+        count=count,
+        llm_payload=llm_payload,
+    )
     _replace_user_identity_models(db, user_id)
 
     models: list[IdentityModel] = []

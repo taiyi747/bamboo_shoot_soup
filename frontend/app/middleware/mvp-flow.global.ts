@@ -5,7 +5,10 @@ const guards: Record<string, GuardFn> = {
   '/persona-constitution': () => Boolean(useMvpFlow().state.value.selectedPrimaryId),
   '/launch-kit': () => Boolean(useMvpFlow().state.value.persona),
   '/consistency-check': () => Boolean(useMvpFlow().state.value.launchKit),
-  '/review': () => Boolean(useMvpFlow().state.value.consistencyCheck),
+  '/content-matrix': () => Boolean(useMvpFlow().state.value.consistencyCheck),
+  '/experiments': () => Boolean(useMvpFlow().state.value.contentMatrix),
+  '/monetization-map': () => useMvpFlow().state.value.experiments.length > 0,
+  '/review': () => Boolean(useMvpFlow().state.value.monetizationMap),
 }
 
 const fallbackRoute: Record<string, string> = {
@@ -13,7 +16,10 @@ const fallbackRoute: Record<string, string> = {
   '/persona-constitution': '/identity-models',
   '/launch-kit': '/persona-constitution',
   '/consistency-check': '/launch-kit',
-  '/review': '/consistency-check',
+  '/content-matrix': '/consistency-check',
+  '/experiments': '/content-matrix',
+  '/monetization-map': '/experiments',
+  '/review': '/monetization-map',
 }
 
 export default defineNuxtRouteMiddleware((to) => {

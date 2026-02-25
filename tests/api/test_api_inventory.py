@@ -32,6 +32,15 @@ EXPECTED_ROUTES = {
     ("GET", "/v1/events/users/{user_id}"),
     ("GET", "/v1/events/name/{event_name}"),
     ("GET", "/v1/events/recent"),
+    ("POST", "/v1/content-matrices/generate"),
+    ("GET", "/v1/content-matrices/users/{user_id}"),
+    ("GET", "/v1/content-matrices/{matrix_id}"),
+    ("POST", "/v1/experiments"),
+    ("PATCH", "/v1/experiments/{experiment_id}/result"),
+    ("GET", "/v1/experiments/users/{user_id}"),
+    ("POST", "/v1/monetization-maps/generate"),
+    ("GET", "/v1/monetization-maps/users/{user_id}"),
+    ("GET", "/v1/monetization-maps/{map_id}"),
 }
 
 
@@ -49,5 +58,5 @@ def _collect_runtime_routes() -> set[tuple[str, str]]:
 
 def test_runtime_routes_match_v1_inventory() -> None:
     runtime_routes = _collect_runtime_routes()
-    assert len(runtime_routes) == 29
+    assert len(runtime_routes) == 38
     assert runtime_routes == EXPECTED_ROUTES

@@ -129,7 +129,7 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
           >
             执行人格一致性检查
           </UButton>
-          <NuxtLink to="/review" class="flex-1 sm:flex-none">
+          <NuxtLink to="/content-matrix" class="flex-1 sm:flex-none">
             <UButton 
               color="neutral" 
               variant="outline" 
@@ -138,7 +138,7 @@ const onSubmit = async (event: FormSubmitEvent<Schema>) => {
               trailing-icon="i-lucide-arrow-right"
               :disabled="loading || !state.consistencyCheck"
             >
-              继续前往交付汇总
+              继续生成内容矩阵
             </UButton>
           </NuxtLink>
         </div>

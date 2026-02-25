@@ -6,6 +6,7 @@ from app.models.identity_model import IdentityModel, IdentitySelection
 from app.models.persona import PersonaConstitution, RiskBoundaryItem
 from app.models.launch_kit import LaunchKit, LaunchKitDay
 from app.models.consistency_check import ConsistencyCheck, EventLog
+from app.models.v1_growth import ContentMatrix, Experiment, MonetizationMap, LLMGenerationReplay
 
 __all__ = [
     "User",
@@ -19,4 +20,8 @@ __all__ = [
     "LaunchKitDay",
     "ConsistencyCheck",
     "EventLog",
+    "ContentMatrix",
+    "Experiment",
+    "MonetizationMap",
+    "LLMGenerationReplay",
 ]

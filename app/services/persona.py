@@ -9,7 +9,8 @@ from pydantic import BaseModel, ValidationError, model_validator
 from sqlalchemy.orm import Session
 
 from app.models.persona import PersonaConstitution, RiskBoundaryItem
-from app.services.llm_client import get_llm_client, llm_schema_error
+from app.services.llm_client import LLMServiceError, get_llm_client, llm_schema_error
+from app.services.llm_replay import generate_json_with_replay, load_latest_replay_payload
 
 
 class _PersonaConstitutionOutput(BaseModel):
@@ -102,12 +103,27 @@ def generate_constitution(
         "hint_forbidden_words": forbidden_words or [],
     }
     # 先调用 LLM，再做严格解析，最后才落库。
-    response_payload = get_llm_client().generate_json(
+    replay_result = generate_json_with_replay(
+        db,
+        user_id=user_id,
         operation="generate_constitution",
         system_prompt=PERSONA_CONSTITUTION_PROMPT,
         user_payload=llm_payload,
+        llm_client=get_llm_client(),
     )
-    output = _parse_constitution(response_payload)
+    try:
+        output = _parse_constitution(replay_result.payload)
+    except LLMServiceError as error:
+        if error.code != "LLM_SCHEMA_VALIDATION_FAILED":
+            raise
+        fallback_payload = load_latest_replay_payload(
+            db,
+            user_id=user_id,
+            operation="generate_constitution",
+        )
+        if fallback_payload is None:
+            raise
+        output = _parse_constitution(fallback_payload)
 
     constitution = PersonaConstitution(
         user_id=user_id,

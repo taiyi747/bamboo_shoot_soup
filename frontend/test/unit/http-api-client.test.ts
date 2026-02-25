@@ -265,4 +265,135 @@ describe('createHttpApiClient', () => {
       identity_model_id: 'identity_1',
     })
   })
+
+  it('maps content matrix, experiments, and monetization map payloads', async () => {
+    const fetchMock = vi.fn(async (path: string) => {
+      if (path === '/v1/content-matrices/generate') {
+        return { id: 'matrix_1' }
+      }
+      if (path === '/v1/content-matrices/matrix_1') {
+        return {
+          matrix_json: JSON.stringify([
+            {
+              pillar: '职业问题拆解',
+              topics: ['topic-1', 'topic-2'],
+              platform_rewrites: {
+                xiaohongshu: ['rewrite-a'],
+                wechat: ['rewrite-b'],
+                video_channel: ['rewrite-c'],
+              },
+            },
+          ]),
+        }
+      }
+      if (path === '/v1/experiments') {
+        return { id: 'exp_1' }
+      }
+      if (path === '/v1/experiments/users/user_1') {
+        return [
+          {
+            id: 'exp_1',
+            hypothesis: '假设',
+            variables_json: '["标题","开头"]',
+            execution_cycle: '7d',
+            result: '',
+            conclusion: '',
+            status: 'planned',
+          },
+        ]
+      }
+      if (path === '/v1/experiments/exp_1/result') {
+        return { id: 'exp_1' }
+      }
+      if (path === '/v1/monetization-maps/generate') {
+        return { id: 'map_1' }
+      }
+      if (path === '/v1/monetization-maps/map_1') {
+        return {
+          primary_path: '咨询服务 -> 小班营',
+          backup_path: '模板产品',
+          weeks_json: JSON.stringify([
+            {
+              week_no: 1,
+              goal: 'goal-1',
+              task: 'task-1',
+              deliverable: 'deliverable-1',
+              validation_metric: 'metric-1',
+            },
+          ]),
+        }
+      }
+      if (path === '/v1/monetization-maps/users/user_1') {
+        return [
+          {
+            primary_path: '咨询服务 -> 小班营',
+            backup_path: '模板产品',
+            weeks_json: JSON.stringify([
+              {
+                week_no: 1,
+                goal: 'goal-1',
+                task: 'task-1',
+                deliverable: 'deliverable-1',
+                validation_metric: 'metric-1',
+              },
+            ]),
+          },
+        ]
+      }
+      throw new Error(`unexpected path: ${path}`)
+    })
+    vi.stubGlobal('$fetch', fetchMock)
+
+    const client = createHttpApiClient('http://127.0.0.1:8000', () => 'user_1')
+
+    const identityModel = {
+      id: 'identity_1',
+      title: '标题',
+      targetAudiencePain: '痛点',
+      contentPillars: [],
+      toneStyleKeywords: [],
+      toneExamples: [],
+      longTermViews: [],
+      differentiation: '差异化',
+      growthPath: { firstQuarter: '', yearOne: '' },
+      monetizationValidationOrder: [],
+      monetizationMap: '',
+      riskBoundaries: [],
+    }
+    const constitution = {
+      commonWords: [],
+      forbiddenWords: [],
+      sentencePreferences: [],
+      immutablePositions: [],
+      narrativeMainline: '',
+      growthArc: [],
+    }
+
+    const matrix = await client.generateContentMatrix({ identityModel, constitution })
+    expect(matrix.contentMatrix.pillars[0]?.pillar).toBe('职业问题拆解')
+
+    const createdExperiment = await client.createExperiment({
+      identityModel,
+      hypothesis: '假设',
+      variables: ['标题'],
+      executionCycle: '7d',
+    })
+    expect(createdExperiment.experimentId).toBe('exp_1')
+
+    const listed = await client.getExperiments()
+    expect(listed.experiments[0]?.variables).toEqual(['标题', '开头'])
+
+    const updated = await client.updateExperimentResult({
+      experimentId: 'exp_1',
+      result: '结果',
+      conclusion: '结论',
+    })
+    expect(updated.updated).toBe(true)
+
+    const monetization = await client.generateMonetizationMap({ identityModel, constitution })
+    expect(monetization.monetizationMap.weeks[0]?.weekNo).toBe(1)
+
+    const maps = await client.getMonetizationMaps()
+    expect(maps.maps[0]?.primaryPath).toBe('咨询服务 -> 小班营')
+  })
 })

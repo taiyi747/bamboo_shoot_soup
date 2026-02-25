@@ -8,6 +8,9 @@ const steps = [
   { to: '/persona-constitution', label: '人格宪法', icon: 'i-lucide-scroll' },
   { to: '/launch-kit', label: '启动包', icon: 'i-lucide-rocket' },
   { to: '/consistency-check', label: '一致性检查', icon: 'i-lucide-check-circle' },
+  { to: '/content-matrix', label: '内容矩阵', icon: 'i-lucide-grid-2x2' },
+  { to: '/experiments', label: '实验面板', icon: 'i-lucide-flask-conical' },
+  { to: '/monetization-map', label: '变现路线', icon: 'i-lucide-trending-up' },
   { to: '/review', label: '交付汇总', icon: 'i-lucide-package-check' },
 ]
 
@@ -17,7 +20,10 @@ const canVisit = (to: string) => {
   if (to === '/persona-constitution') return Boolean(s.selectedPrimaryId)
   if (to === '/launch-kit') return Boolean(s.persona)
   if (to === '/consistency-check') return Boolean(s.launchKit)
-  if (to === '/review') return Boolean(s.consistencyCheck)
+  if (to === '/content-matrix') return Boolean(s.consistencyCheck)
+  if (to === '/experiments') return Boolean(s.contentMatrix)
+  if (to === '/monetization-map') return s.experiments.length > 0
+  if (to === '/review') return Boolean(s.monetizationMap)
   return true
 }
 

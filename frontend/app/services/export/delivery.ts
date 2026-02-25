@@ -3,9 +3,12 @@ import { save } from '@tauri-apps/plugin-dialog'
 import { writeTextFile } from '@tauri-apps/plugin-fs'
 import type {
   AnalyticsEventPayload,
+  ContentMatrix,
   ConsistencyCheckResult,
+  ExperimentRecord,
   IdentityModelCard,
   LaunchKit,
+  MonetizationMap,
   OnboardingProfile,
   PersonaConstitution,
 } from '../../types/flow'
@@ -17,6 +20,9 @@ export interface DeliveryPackagePayload {
   constitution?: PersonaConstitution
   launchKit?: LaunchKit
   consistencyCheck?: ConsistencyCheckResult
+  contentMatrix?: ContentMatrix
+  experiments?: ExperimentRecord[]
+  monetizationMap?: MonetizationMap
   events: AnalyticsEventPayload[]
 }
 

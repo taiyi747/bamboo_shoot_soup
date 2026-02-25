@@ -74,6 +74,40 @@ export interface LaunchKit {
   growthExperiment: GrowthExperiment
 }
 
+export interface ContentMatrixPillar {
+  pillar: string
+  topics: string[]
+  platformRewrites: Record<string, string[]>
+}
+
+export interface ContentMatrix {
+  pillars: ContentMatrixPillar[]
+}
+
+export interface ExperimentRecord {
+  id: string
+  hypothesis: string
+  variables: string[]
+  executionCycle: string
+  result: string
+  conclusion: string
+  status: 'planned' | 'completed'
+}
+
+export interface MonetizationWeekPlan {
+  weekNo: number
+  goal: string
+  task: string
+  deliverable: string
+  validationMetric: string
+}
+
+export interface MonetizationMap {
+  primaryPath: string
+  backupPath: string
+  weeks: MonetizationWeekPlan[]
+}
+
 export interface ConsistencyCheckResult {
   deviations: string[]
   reasons: string[]
@@ -111,6 +145,9 @@ export interface MvpFlowState {
   selectedBackupId?: string
   persona?: PersonaConstitution
   launchKit?: LaunchKit
+  contentMatrix?: ContentMatrix
+  experiments: ExperimentRecord[]
+  monetizationMap?: MonetizationMap
   draftToCheck: string
   consistencyCheck?: ConsistencyCheckResult
   events: AnalyticsEventPayload[]

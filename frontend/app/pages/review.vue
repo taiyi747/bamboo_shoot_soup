@@ -5,7 +5,16 @@ const toast = useToast()
 const { state, selectedPrimaryModel, selectedBackupModel, reset } = useMvpFlow()
 
 const hasCoreArtifacts = computed(
-  () => Boolean(selectedPrimaryModel.value && state.value.persona && state.value.launchKit && state.value.consistencyCheck)
+  () =>
+    Boolean(
+      selectedPrimaryModel.value &&
+        state.value.persona &&
+        state.value.launchKit &&
+        state.value.consistencyCheck &&
+        state.value.contentMatrix &&
+        state.value.experiments.length > 0 &&
+        state.value.monetizationMap
+    )
 )
 
 const exportJson = async () => {
@@ -25,6 +34,9 @@ const exportJson = async () => {
     constitution: state.value.persona,
     launchKit: state.value.launchKit,
     consistencyCheck: state.value.consistencyCheck,
+    contentMatrix: state.value.contentMatrix,
+    experiments: state.value.experiments,
+    monetizationMap: state.value.monetizationMap,
     events: state.value.events,
   }
 
@@ -76,7 +88,7 @@ const startOver = async () => {
               最终交付物汇总 (Delivery Review)
             </h2>
             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-              MVP 最小功能核心闭环：包含你的主身份模型、人格宪法约束、7日启动模板及内容一次性检查依据。
+              V1 展示闭环：身份模型、人格宪法、启动包、一致性检查、内容矩阵、实验记录与 12 周变现图。
             </p>
           </div>
         </div>
@@ -87,7 +99,7 @@ const startOver = async () => {
         color="warning"
         variant="soft"
         title="环节未闭环"
-        description="请先完成从 onboarding 到 launch kit 的所有前置步骤，方可通过一致性检查后导出完整交付物。"
+        description="请先完成从 onboarding 到 monetization map 的所有前置步骤，再导出完整 V1 交付物。"
         icon="i-lucide-shield-alert"
         class="mb-6"
       />
@@ -146,6 +158,44 @@ const startOver = async () => {
               </span>
             </div>
           </div>
+        </UCard>
+      </div>
+
+      <div class="mt-6 grid gap-6 lg:grid-cols-3">
+        <UCard class="surface-card border border-indigo-100 dark:border-indigo-900/30 bg-indigo-50/10 dark:bg-indigo-950/5">
+          <template #header>
+            <div class="flex items-center gap-2">
+              <UIcon name="i-lucide-grid-2x2" class="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+              <h3 class="text-lg font-bold text-slate-900 dark:text-white">内容矩阵</h3>
+            </div>
+          </template>
+          <p class="text-sm text-slate-600 dark:text-slate-300">
+            支柱数量：<span class="font-semibold">{{ state.contentMatrix?.pillars.length ?? 0 }}</span>
+          </p>
+        </UCard>
+
+        <UCard class="surface-card border border-amber-100 dark:border-amber-900/30 bg-amber-50/10 dark:bg-amber-950/5">
+          <template #header>
+            <div class="flex items-center gap-2">
+              <UIcon name="i-lucide-flask-conical" class="w-5 h-5 text-amber-600 dark:text-amber-500" />
+              <h3 class="text-lg font-bold text-slate-900 dark:text-white">实验面板</h3>
+            </div>
+          </template>
+          <p class="text-sm text-slate-600 dark:text-slate-300">
+            实验数：<span class="font-semibold">{{ state.experiments.length }}</span>
+          </p>
+        </UCard>
+
+        <UCard class="surface-card border border-teal-100 dark:border-teal-900/30 bg-teal-50/10 dark:bg-teal-950/5">
+          <template #header>
+            <div class="flex items-center gap-2">
+              <UIcon name="i-lucide-trending-up" class="w-5 h-5 text-teal-600 dark:text-teal-400" />
+              <h3 class="text-lg font-bold text-slate-900 dark:text-white">12 周变现图</h3>
+            </div>
+          </template>
+          <p class="text-sm text-slate-600 dark:text-slate-300">
+            周计划：<span class="font-semibold">{{ state.monetizationMap?.weeks.length ?? 0 }}</span>
+          </p>
         </UCard>
       </div>
 

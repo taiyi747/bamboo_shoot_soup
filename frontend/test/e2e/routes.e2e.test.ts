@@ -19,4 +19,9 @@ describe('route flow', async () => {
     const html = await $fetch('/review')
     expect(html).toContain('身份诊断')
   })
+
+  it('blocks monetization route before prerequisites are met', async () => {
+    const html = await $fetch('/monetization-map')
+    expect(html).toContain('身份诊断')
+  })
 })

@@ -125,7 +125,9 @@ class LLMClient:
         self._openai = openai
         self._model_name = settings.model_name or ""
         self._max_retries = settings.openai_max_retries
-        self._reason = settings.reason
+        # Keep both attribute names for compatibility with existing tests/mocks.
+        self._reason = settings.reasoning
+        self._reasoning = settings.reasoning
         self._client = OpenAI(
             api_key=settings.openai_api_key,
             base_url=normalize_openai_base_url(settings.openai_base_url or ""),
@@ -223,6 +225,7 @@ class LLMClient:
         messages: list[dict[str, str]],
         include_reason: bool,
     ) -> dict[str, Any]:
+        reason_flag = getattr(self, "_reason", getattr(self, "_reasoning", None))
         request: dict[str, Any] = {
             "model": self._model_name,
             "messages": messages,
@@ -230,11 +233,11 @@ class LLMClient:
             "response_format": {"type": "json_object"},
             "temperature": 0.2,
         }
-        if include_reason and self._reason is not None:
-            extra_body: dict[str, Any] = {"easoning": self._reason}
+        if include_reason and reason_flag is not None:
+            extra_body: dict[str, Any] = {"reasoning": reason_flag}
             # For many OpenAI-compatible gateways, reason=false alone does not
             # disable reasoning, while enable_thinking=false does.
-            if self._reason is False:
+            if reason_flag is False:
                 extra_body["enable_thinking"] = False
             request["extra_body"] = extra_body
         return request
@@ -296,7 +299,8 @@ class LLMClient:
         operation: str,
         messages: list[dict[str, str]],
     ) -> Any:
-        include_reason = self._reason is not None
+        reason_flag = getattr(self, "_reason", getattr(self, "_reasoning", None))
+        include_reason = reason_flag is not None
         try:
             return self._create_completion(
                 operation=operation,

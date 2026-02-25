@@ -26,6 +26,11 @@ uvicorn app.main:app --reload
 
 On startup, the backend automatically runs `alembic upgrade head` against `DATABASE_URL`.
 
+Demo replay fallback switches:
+
+- `DEMO_REPLAY_FALLBACK_ENABLED=true`
+- `DEMO_REPLAY_FORCE=false`
+
 Health check:
 
 ```bash

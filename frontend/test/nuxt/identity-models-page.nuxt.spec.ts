@@ -55,6 +55,7 @@ const createFlowState = (): MvpFlowState => ({
       riskBoundaries: ['不虚假承诺'],
     },
   ],
+  experiments: [],
   selectedPrimaryId: undefined,
   selectedBackupId: undefined,
   draftToCheck: '',

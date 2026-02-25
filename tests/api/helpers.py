@@ -10,6 +10,7 @@ from app.models.identity_model import IdentityModel
 from app.models.launch_kit import LaunchKit, LaunchKitDay
 from app.models.onboarding import CapabilityProfile, OnboardingSession
 from app.models.persona import PersonaConstitution, RiskBoundaryItem
+from app.models.v1_growth import ContentMatrix, Experiment, MonetizationMap
 
 
 def create_onboarding_session(
@@ -219,3 +220,92 @@ def create_event_log(
     db.commit()
     db.refresh(event)
     return event
+
+
+def create_content_matrix(
+    db: Session,
+    *,
+    user_id: str,
+    identity_model_id: str | None = None,
+    constitution_id: str | None = None,
+) -> ContentMatrix:
+    matrix = ContentMatrix(
+        user_id=user_id,
+        identity_model_id=identity_model_id,
+        constitution_id=constitution_id,
+        content_pillars_json=json.dumps(["pillar-1", "pillar-2", "pillar-3"], ensure_ascii=False),
+        matrix_json=json.dumps(
+            [
+                {
+                    "pillar": "pillar-1",
+                    "topics": [f"topic-{i}" for i in range(1, 21)],
+                    "platform_rewrites": {
+                        "xiaohongshu": ["r1"],
+                        "wechat": ["r2"],
+                        "video_channel": ["r3"],
+                    },
+                }
+            ],
+            ensure_ascii=False,
+        ),
+    )
+    db.add(matrix)
+    db.commit()
+    db.refresh(matrix)
+    return matrix
+
+
+def create_experiment(
+    db: Session,
+    *,
+    user_id: str,
+    identity_model_id: str | None = None,
+    status: str = "planned",
+) -> Experiment:
+    experiment = Experiment(
+        user_id=user_id,
+        identity_model_id=identity_model_id,
+        hypothesis="CTA headline A increases save rate",
+        variables_json=json.dumps(["title", "opening"], ensure_ascii=False),
+        execution_cycle="7d",
+        result="",
+        conclusion="",
+        status=status,
+    )
+    db.add(experiment)
+    db.commit()
+    db.refresh(experiment)
+    return experiment
+
+
+def create_monetization_map(
+    db: Session,
+    *,
+    user_id: str,
+    identity_model_id: str | None = None,
+    constitution_id: str | None = None,
+) -> MonetizationMap:
+    monetization_map = MonetizationMap(
+        user_id=user_id,
+        identity_model_id=identity_model_id,
+        constitution_id=constitution_id,
+        primary_path="Consulting -> Cohort",
+        backup_path="Template bundle",
+        weeks_json=json.dumps(
+            [
+                {
+                    "week_no": i,
+                    "goal": f"goal-{i}",
+                    "task": f"task-{i}",
+                    "deliverable": f"deliverable-{i}",
+                    "validation_metric": f"metric-{i}",
+                }
+                for i in range(1, 13)
+            ],
+            ensure_ascii=False,
+        ),
+    )
+    db.add(monetization_map)
+    db.commit()
+    db.refresh(monetization_map)
+    return monetization_map

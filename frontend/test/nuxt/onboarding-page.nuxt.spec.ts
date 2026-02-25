@@ -20,6 +20,7 @@ const createFlowState = (): MvpFlowState => ({
     goals: [],
   },
   identityModels: [],
+  experiments: [],
   draftToCheck: '',
   events: [],
 })

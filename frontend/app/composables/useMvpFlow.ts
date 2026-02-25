@@ -13,6 +13,7 @@ const defaultInput = () => ({
 const defaultState = (): MvpFlowState => ({
   onboardingInput: defaultInput(),
   identityModels: [],
+  experiments: [],
   draftToCheck: '',
   events: [],
 })

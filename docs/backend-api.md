@@ -575,13 +575,34 @@
 | Persona Constitution | `/v1/persona-constitutions/*` |
 | 7-Day Launch Kit | `/v1/launch-kits/*` |
 | Risk & Boundary List | `/v1/risk-boundaries/*` |
-| Content Pillars & Matrix（V1） | 暂无独立 API |
-| Monetization Map（V1） | 暂无独立 API |
+| Content Pillars & Matrix（V1） | `/v1/content-matrices/*` |
+| Monetization Map（V1） | `/v1/monetization-maps/*` |
+| Growth Experiment Panel（V1） | `/v1/experiments/*` |
 
-## 11. V1 后续接口建议（补齐差距）
+## 11. V1 新增接口（已实现）
 
-- `GET/POST /v1/content-matrixes`：内容支柱 -> 选题池 -> 多平台改写
-- `GET/POST /v1/monetization-maps`：12 周路线图与验证节点
-- `GET/POST /v1/experiments`：假设、变量、周期、结果、结论、迭代
+### 11.1 Content Matrix
 
-以上 3 组接口补齐后，V1 交付物可闭环覆盖。
+- `POST /v1/content-matrices/generate`
+- `GET /v1/content-matrices/users/{user_id}`
+- `GET /v1/content-matrices/{matrix_id}`
+
+### 11.2 Experiments
+
+- `POST /v1/experiments`
+- `PATCH /v1/experiments/{experiment_id}/result`
+- `GET /v1/experiments/users/{user_id}`
+
+### 11.3 Monetization Map
+
+- `POST /v1/monetization-maps/generate`
+- `GET /v1/monetization-maps/users/{user_id}`
+- `GET /v1/monetization-maps/{map_id}`
+
+## 12. 黑客松演示可靠性（Replay Fallback）
+
+- 新增表：`llm_generation_replays`
+- 适用操作：`generate_identity_models`、`generate_constitution`、`generate_launch_kit`、`check_consistency`、`generate_content_matrix`、`generate_monetization_map`
+- 环境开关：
+  - `DEMO_REPLAY_FALLBACK_ENABLED=true`
+  - `DEMO_REPLAY_FORCE=false`
