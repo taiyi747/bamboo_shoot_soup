@@ -72,6 +72,29 @@ class _LaunchKitOutput(BaseModel):
         return self
 
 
+class _LaunchKitDayArticleOutput(BaseModel):
+    """Single day article output schema."""
+
+    day_no: int
+    title: str
+    markdown: str
+
+    @field_validator("day_no")
+    @classmethod
+    def validate_day_no(cls, value: int) -> int:
+        if value < 1 or value > 7:
+            raise ValueError("day_no must be between 1 and 7")
+        return value
+
+    @model_validator(mode="after")
+    def validate_text(self) -> "_LaunchKitDayArticleOutput":
+        if not self.title.strip():
+            raise ValueError("title must be non-empty")
+        if not self.markdown.strip():
+            raise ValueError("markdown must be non-empty")
+        return self
+
+
 @dataclass
 class _ContextResolutionResult:
     context_bundle: dict[str, Any]
@@ -170,6 +193,43 @@ Schema：
 - 必须保持与 original_user_payload 中 context_bundle 的语义对齐。
 """.strip()
 
+LAUNCH_KIT_DAY_ARTICLE_PROMPT = """
+You are generating a single publish-ready article from one launch-kit day card.
+Return strict JSON only.
+
+Target JSON schema:
+{
+  "day_no": 1,
+  "title": "string",
+  "markdown": "string"
+}
+
+Hard constraints:
+- Keep day_no unchanged from input.
+- title must be non-empty and concise.
+- markdown must be non-empty and ready to publish.
+- No markdown code fences in markdown body.
+- Do not output extra keys.
+- Align style with context_bundle when provided.
+""".strip()
+
+LAUNCH_KIT_DAY_ARTICLE_REPAIR_PROMPT = """
+You are repairing an invalid launch-kit day article JSON.
+Return strict JSON only and satisfy the target schema exactly.
+
+Schema:
+{
+  "day_no": 1,
+  "title": "string",
+  "markdown": "string"
+}
+
+Hard constraints:
+- Keep day_no unchanged from original_user_payload.
+- title and markdown must be non-empty.
+- No extra keys.
+""".strip()
+
 
 def _parse_launch_kit(payload: dict[str, Any]) -> _LaunchKitOutput:
     """Validate launch kit payload before persistence."""
@@ -180,6 +240,29 @@ def _parse_launch_kit(payload: dict[str, Any]) -> _LaunchKitOutput:
             "generate_launch_kit",
             f"Launch kit schema validation failed: {exc}",
         ) from exc
+
+
+def _parse_launch_kit_day_article(
+    payload: dict[str, Any],
+    *,
+    expected_day_no: int,
+) -> _LaunchKitDayArticleOutput:
+    """Validate day article payload."""
+    try:
+        output = _LaunchKitDayArticleOutput.model_validate(payload)
+    except ValidationError as exc:
+        raise llm_schema_error(
+            "generate_launch_kit_day_article",
+            f"Launch kit day article schema validation failed: {exc}",
+        ) from exc
+
+    if output.day_no != expected_day_no:
+        raise llm_schema_error(
+            "generate_launch_kit_day_article",
+            f"Launch kit day article day_no mismatch: expected={expected_day_no} actual={output.day_no}",
+        )
+
+    return output
 
 
 def _validation_error_brief(error_message: str) -> str:
@@ -585,6 +668,66 @@ def _generate_launch_kit_output(*, llm_payload: dict[str, Any]) -> tuple[_Launch
     )
 
 
+def _generate_launch_kit_day_article_output(
+    *,
+    llm_payload: dict[str, Any],
+    expected_day_no: int,
+) -> tuple[_LaunchKitDayArticleOutput, int]:
+    llm_client = get_llm_client()
+    response_payload = llm_client.generate_json(
+        operation="generate_launch_kit_day_article",
+        system_prompt=LAUNCH_KIT_DAY_ARTICLE_PROMPT,
+        user_payload=llm_payload,
+    )
+
+    try:
+        return _parse_launch_kit_day_article(
+            response_payload,
+            expected_day_no=expected_day_no,
+        ), 0
+    except LLMServiceError as exc:
+        if exc.code != "LLM_SCHEMA_VALIDATION_FAILED":
+            raise
+        last_error = exc
+
+    last_payload = response_payload
+    for attempt in range(1, SCHEMA_REPAIR_MAX_RETRIES + 1):
+        logger.warning(
+            "schema_retry operation=generate_launch_kit_day_article schema_retry_attempt=%s validation_error_brief=%s degraded=%s",
+            attempt,
+            _validation_error_brief(last_error.message),
+            False,
+        )
+        repair_payload = {
+            "original_user_payload": llm_payload,
+            "previous_invalid_response": last_payload,
+            "validation_error": last_error.message,
+        }
+        repaired_payload = llm_client.generate_json(
+            operation="generate_launch_kit_day_article",
+            system_prompt=LAUNCH_KIT_DAY_ARTICLE_REPAIR_PROMPT,
+            user_payload=repair_payload,
+        )
+        try:
+            return _parse_launch_kit_day_article(
+                repaired_payload,
+                expected_day_no=expected_day_no,
+            ), attempt
+        except LLMServiceError as exc:
+            if exc.code != "LLM_SCHEMA_VALIDATION_FAILED":
+                raise
+            last_error = exc
+            last_payload = repaired_payload
+
+    raise llm_schema_error(
+        "generate_launch_kit_day_article",
+        (
+            "Launch kit day article schema validation failed after 2 schema repair retries. "
+            f"Last error: {_validation_error_brief(last_error.message)}"
+        ),
+    )
+
+
 def generate_launch_kit(
     db: Session,
     user_id: str,
@@ -660,6 +803,71 @@ def generate_launch_kit(
         logger.info(
             "launch_kit_generation_metrics user_id=%s context_resolve_ms=%s llm_generate_ms=%s schema_repair_attempts=%s total_ms=%s context_sources=%s",
             user_id,
+            context_resolve_ms,
+            llm_generate_ms,
+            schema_repair_attempts,
+            total_ms,
+            json.dumps(context_sources, ensure_ascii=False, sort_keys=True),
+        )
+
+
+def generate_launch_kit_day_article(
+    db: Session,
+    user_id: str,
+    day_no: int,
+    theme: str,
+    draft_or_outline: str,
+    opening_text: str,
+    identity_model_id: str | None = None,
+    constitution_id: str | None = None,
+) -> _LaunchKitDayArticleOutput:
+    """Generate a single launch-kit day article via LLM without persistence."""
+    total_start = time.perf_counter()
+    context_resolve_ms = 0
+    llm_generate_ms = 0
+    schema_repair_attempts = 0
+    context_sources = {
+        "identity_model_source": "none",
+        "persona_constitution_source": "none",
+        "capability_profile_source": "none",
+        "risk_boundaries_source": "none",
+    }
+
+    try:
+        context_start = time.perf_counter()
+        context_resolution = _resolve_context_bundle(
+            db=db,
+            user_id=user_id,
+            requested_identity_model_id=identity_model_id,
+            requested_constitution_id=constitution_id,
+        )
+        context_resolve_ms = int((time.perf_counter() - context_start) * 1000)
+        context_sources = context_resolution.context_sources
+
+        llm_payload = {
+            "user_id": user_id,
+            "identity_model_id": context_resolution.resolved_identity_model_id,
+            "constitution_id": context_resolution.resolved_constitution_id,
+            "day_no": day_no,
+            "theme": theme,
+            "draft_or_outline": draft_or_outline,
+            "opening_text": opening_text,
+            "context_bundle": context_resolution.context_bundle,
+        }
+
+        llm_start = time.perf_counter()
+        output, schema_repair_attempts = _generate_launch_kit_day_article_output(
+            llm_payload=llm_payload,
+            expected_day_no=day_no,
+        )
+        llm_generate_ms = int((time.perf_counter() - llm_start) * 1000)
+        return output
+    finally:
+        total_ms = int((time.perf_counter() - total_start) * 1000)
+        logger.info(
+            "launch_kit_day_article_generation_metrics user_id=%s day_no=%s context_resolve_ms=%s llm_generate_ms=%s schema_repair_attempts=%s total_ms=%s context_sources=%s",
+            user_id,
+            day_no,
             context_resolve_ms,
             llm_generate_ms,
             schema_repair_attempts,

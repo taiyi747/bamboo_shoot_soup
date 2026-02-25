@@ -1,47 +1,48 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+﻿import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mountSuspended, mockNuxtImport } from '@nuxt/test-utils/runtime'
 import { flushPromises } from '@vue/test-utils'
 import { computed, ref } from 'vue'
 import type { IdentityModelCard, LaunchKit, MvpFlowState, PersonaConstitution } from '../../app/types/flow'
 
 const generateLaunchKitMock = vi.hoisted(() => vi.fn())
+const generateLaunchKitDayArticleMock = vi.hoisted(() => vi.fn())
 const trackMock = vi.hoisted(() => vi.fn())
 
 const primaryModel: IdentityModelCard = {
   id: 'identity_1',
-  title: '职场效率解剖师',
-  targetAudiencePain: '表达效率低',
-  contentPillars: ['职业问题拆解', '方法模板演示', '复盘体系'],
-  toneStyleKeywords: ['克制', '结构化'],
-  toneExamples: ['先给结论，再展开步骤。'],
-  longTermViews: ['观点1', '观点2', '观点3', '观点4', '观点5'],
-  differentiation: '真实周复盘',
-  growthPath: { firstQuarter: '先做内容结构', yearOne: '形成产品化能力' },
-  monetizationValidationOrder: ['私域线索', '咨询'],
-  monetizationMap: '私域线索 -> 咨询',
-  riskBoundaries: ['避免夸大收益'],
+  title: 'Primary Identity',
+  targetAudiencePain: 'Pain',
+  contentPillars: ['P1', 'P2', 'P3'],
+  toneStyleKeywords: ['calm', 'clear'],
+  toneExamples: ['e1', 'e2', 'e3', 'e4', 'e5'],
+  longTermViews: ['v1', 'v2', 'v3', 'v4', 'v5'],
+  differentiation: 'Different',
+  growthPath: { firstQuarter: 'q1', yearOne: 'y1' },
+  monetizationValidationOrder: ['m1'],
+  monetizationMap: 'm1',
+  riskBoundaries: ['r1'],
 }
 
 const persona: PersonaConstitution = {
-  commonWords: ['拆解', '验证'],
-  forbiddenWords: ['暴富'],
-  sentencePreferences: ['先结论后步骤'],
-  immutablePositions: ['不做虚假承诺'],
-  narrativeMainline: '从执行者到系统构建者',
-  growthArc: [{ stage: '0-3月', storyTemplate: '从混乱到稳定输出' }],
+  commonWords: ['clarity'],
+  forbiddenWords: ['promise'],
+  sentencePreferences: ['one idea per paragraph'],
+  immutablePositions: ['no fake claims'],
+  narrativeMainline: 'Build trust over time',
+  growthArc: [{ stage: '0-3m', storyTemplate: 'chaos to stable output' }],
 }
 
 const sampleLaunchKit: LaunchKit = {
   days: [
-    { day: 1, theme: '主题1', draftOutline: '大纲1', opening: '开头1' },
-    { day: 2, theme: '主题2', draftOutline: '大纲2', opening: '开头2' },
+    { day: 1, theme: 'Theme 1', draftOutline: 'Outline 1', opening: 'Opening 1' },
+    { day: 2, theme: 'Theme 2', draftOutline: 'Outline 2', opening: 'Opening 2' },
   ],
-  sustainableColumns: ['栏目1', '栏目2', '栏目3'],
+  sustainableColumns: ['Column 1', 'Column 2', 'Column 3'],
   growthExperiment: {
-    hypothesis: '假设',
-    variables: ['标题', '封面'],
-    executionCycle: '7天',
-    successMetric: '收藏率',
+    hypothesis: 'Hypothesis',
+    variables: ['Title', 'Cover'],
+    executionCycle: '7d',
+    successMetric: 'Save rate',
   },
 }
 
@@ -70,6 +71,7 @@ const selectedPrimaryModel = computed(() =>
 vi.mock('../../app/services/api/client', () => ({
   useApiClient: () => ({
     generateLaunchKit: generateLaunchKitMock,
+    generateLaunchKitDayArticle: generateLaunchKitDayArticleMock,
   }),
 }))
 
@@ -97,53 +99,132 @@ describe('launch kit page', () => {
     state.value = createFlowState()
     generateLaunchKitMock.mockReset()
     generateLaunchKitMock.mockResolvedValue({ launchKit: sampleLaunchKit })
+    generateLaunchKitDayArticleMock.mockReset()
+    generateLaunchKitDayArticleMock.mockResolvedValue({
+      dayNo: 1,
+      title: 'Day 1 Article',
+      markdown: '# Day 1\n\nContent body',
+    })
     trackMock.mockReset()
     trackMock.mockResolvedValue({})
   })
 
-  it('shows loading feedback and blocks duplicate generation requests', async () => {
+  it('shows loading feedback and blocks duplicate launch-kit generation requests', async () => {
     const deferred = createDeferred<{ launchKit: LaunchKit }>()
     generateLaunchKitMock.mockReturnValueOnce(deferred.promise)
 
     const LaunchKitPage = (await import('../../app/pages/launch-kit.vue')).default
     const wrapper = await mountSuspended(LaunchKitPage)
-    const generateButton = wrapper.findAll('button').find(button => button.text().includes('一键生成 7 天启动包'))
+    const generateButton = wrapper.find('[data-testid="launch-kit-generate-button"]')
 
-    expect(generateButton).toBeTruthy()
-    await generateButton!.trigger('click')
-    await generateButton!.trigger('click')
+    expect(generateButton.exists()).toBe(true)
+    await generateButton.trigger('click')
+    await generateButton.trigger('click')
     await flushPromises()
 
     expect(generateLaunchKitMock).toHaveBeenCalledTimes(1)
     expect(wrapper.find('[data-testid="generation-feedback-card"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('正在生成 7-Day Launch Kit')
 
     deferred.resolve({ launchKit: sampleLaunchKit })
     await flushPromises()
 
     expect(wrapper.find('[data-testid="generation-feedback-card"]').exists()).toBe(false)
-    expect(wrapper.text()).toContain('首周内容排期 (Day 1-7)')
+    expect(wrapper.text()).toContain('Week 1 Schedule (Day 1-7)')
     expect(trackMock).toHaveBeenCalledWith(
       'launch_kit_generated',
       primaryModel.id,
       expect.objectContaining({
         ui_feedback_variant: 'card_skeleton',
         loading_duration_ms: expect.any(Number),
+        article_cache_cleared: true,
       })
     )
   })
 
-  it('shows error and hides feedback when generation fails', async () => {
-    generateLaunchKitMock.mockRejectedValueOnce(new Error('启动包生成失败'))
+  it('shows error and hides feedback when launch-kit generation fails', async () => {
+    generateLaunchKitMock.mockRejectedValueOnce(new Error('Launch kit generation failed.'))
 
     const LaunchKitPage = (await import('../../app/pages/launch-kit.vue')).default
     const wrapper = await mountSuspended(LaunchKitPage)
-    const generateButton = wrapper.findAll('button').find(button => button.text().includes('一键生成 7 天启动包'))
+    const generateButton = wrapper.find('[data-testid="launch-kit-generate-button"]')
 
-    await generateButton!.trigger('click')
+    await generateButton.trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('启动包生成失败')
+    expect(wrapper.text()).toContain('Launch kit generation failed.')
     expect(wrapper.find('[data-testid="generation-feedback-card"]').exists()).toBe(false)
+  })
+
+  it('uses in-memory cache after first day article success and still opens modal', async () => {
+    state.value.launchKit = sampleLaunchKit
+
+    const LaunchKitPage = (await import('../../app/pages/launch-kit.vue')).default
+    const wrapper = await mountSuspended(LaunchKitPage)
+
+    const dayOneButton = wrapper.find('[data-testid="day-article-generate-1"]')
+    await dayOneButton.trigger('click')
+    await flushPromises()
+
+    expect(generateLaunchKitDayArticleMock).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('[data-testid="day-article-modal"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="day-article-title"]').text()).toContain('Day 1 Article')
+
+    await wrapper.find('[data-testid="day-article-close"]').trigger('click')
+    await flushPromises()
+
+    await dayOneButton.trigger('click')
+    await flushPromises()
+
+    expect(generateLaunchKitDayArticleMock).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('[data-testid="day-article-modal"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="day-article-preview"]').text()).toContain('Content body')
+  })
+
+  it('clears day article cache after launch-kit regeneration success', async () => {
+    state.value.launchKit = sampleLaunchKit
+
+    const LaunchKitPage = (await import('../../app/pages/launch-kit.vue')).default
+    const wrapper = await mountSuspended(LaunchKitPage)
+
+    const dayOneButton = wrapper.find('[data-testid="day-article-generate-1"]')
+    await dayOneButton.trigger('click')
+    await flushPromises()
+    expect(generateLaunchKitDayArticleMock).toHaveBeenCalledTimes(1)
+
+    const regenerateButton = wrapper.find('[data-testid="launch-kit-regenerate-button"]')
+    await regenerateButton.trigger('click')
+    await flushPromises()
+
+    await dayOneButton.trigger('click')
+    await flushPromises()
+
+    expect(generateLaunchKitDayArticleMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not cache failed day article response and retries next click', async () => {
+    state.value.launchKit = sampleLaunchKit
+    generateLaunchKitDayArticleMock
+      .mockRejectedValueOnce(new Error('Day article generation failed.'))
+      .mockResolvedValueOnce({
+        dayNo: 1,
+        title: 'Day 1 Article Retry',
+        markdown: '# Retry',
+      })
+
+    const LaunchKitPage = (await import('../../app/pages/launch-kit.vue')).default
+    const wrapper = await mountSuspended(LaunchKitPage)
+
+    const dayOneButton = wrapper.find('[data-testid="day-article-generate-1"]')
+    await dayOneButton.trigger('click')
+    await flushPromises()
+
+    expect(generateLaunchKitDayArticleMock).toHaveBeenCalledTimes(1)
+    expect(wrapper.text()).toContain('Day article generation failed.')
+
+    await dayOneButton.trigger('click')
+    await flushPromises()
+
+    expect(generateLaunchKitDayArticleMock).toHaveBeenCalledTimes(2)
+    expect(wrapper.find('[data-testid="day-article-title"]').text()).toContain('Day 1 Article Retry')
   })
 })

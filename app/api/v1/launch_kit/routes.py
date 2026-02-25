@@ -6,7 +6,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.schemas.launch_kit import LaunchKitGenerate, LaunchKitResponse
+from app.schemas.launch_kit import (
+    LaunchKitDayArticleGenerate,
+    LaunchKitDayArticleResponse,
+    LaunchKitGenerate,
+    LaunchKitResponse,
+)
 from app.services.llm_client import LLMServiceError
 from app.services import launch_kit as launch_kit_service
 from app.services.event_log import log_event
@@ -55,6 +60,33 @@ def generate_launch_kit(
             for d in kit.days
         ],
     }
+
+
+@router.post("/day-articles/generate", response_model=LaunchKitDayArticleResponse)
+def generate_launch_kit_day_article(
+    body: LaunchKitDayArticleGenerate,
+    db: Session = Depends(get_db),
+) -> LaunchKitDayArticleResponse:
+    """Generate one day article for launch kit."""
+    try:
+        article = launch_kit_service.generate_launch_kit_day_article(
+            db=db,
+            user_id=body.user_id,
+            identity_model_id=body.identity_model_id,
+            constitution_id=body.constitution_id,
+            day_no=body.day_no,
+            theme=body.theme,
+            draft_or_outline=body.draft_or_outline,
+            opening_text=body.opening_text,
+        )
+    except LLMServiceError as error:
+        raise HTTPException(status_code=502, detail=error.to_detail()) from error
+
+    return LaunchKitDayArticleResponse(
+        day_no=article.day_no,
+        title=article.title,
+        markdown=article.markdown,
+    )
 
 
 @router.get("/users/{user_id}", response_model=list[LaunchKitResponse])

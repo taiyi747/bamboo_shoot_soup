@@ -15,6 +15,26 @@ class LaunchKitGenerate(BaseModel):
     growth_experiment_suggestion: list[dict[str, str]] = Field(default_factory=list)
 
 
+class LaunchKitDayArticleGenerate(BaseModel):
+    """Generate launch-kit day article request."""
+
+    user_id: str
+    identity_model_id: str | None = None
+    constitution_id: str | None = None
+    day_no: int = Field(ge=1, le=7)
+    theme: str = Field(min_length=1)
+    draft_or_outline: str = Field(min_length=1)
+    opening_text: str = Field(min_length=1)
+
+
+class LaunchKitDayArticleResponse(BaseModel):
+    """Launch-kit day article response."""
+
+    day_no: int
+    title: str
+    markdown: str
+
+
 class LaunchKitDayResponse(BaseModel):
     """Launch kit day response."""
     id: str

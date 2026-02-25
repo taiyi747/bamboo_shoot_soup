@@ -153,6 +153,46 @@ def test_launch_kit_route_passes_expected_parameters(monkeypatch, tmp_path) -> N
         engine.dispose()
 
 
+def test_launch_kit_day_article_route_passes_expected_parameters(monkeypatch, tmp_path) -> None:
+    client, user_id, engine = _create_test_client(monkeypatch, tmp_path)
+    captured: dict = {}
+    try:
+        def _fake_generate_day_article(**kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(day_no=1, title="Title", markdown="# Markdown")
+
+        monkeypatch.setattr(launch_kit_service, "generate_launch_kit_day_article", _fake_generate_day_article)
+        response = client.post(
+            "/v1/launch-kits/day-articles/generate",
+            json={
+                "user_id": user_id,
+                "identity_model_id": "identity-2",
+                "constitution_id": "constitution-2",
+                "day_no": 1,
+                "theme": "t",
+                "draft_or_outline": "d",
+                "opening_text": "o",
+            },
+        )
+        assert response.status_code == 200
+        assert response.json() == {
+            "day_no": 1,
+            "title": "Title",
+            "markdown": "# Markdown",
+        }
+        assert captured["user_id"] == user_id
+        assert captured["identity_model_id"] == "identity-2"
+        assert captured["constitution_id"] == "constitution-2"
+        assert captured["day_no"] == 1
+        assert captured["theme"] == "t"
+        assert captured["draft_or_outline"] == "d"
+        assert captured["opening_text"] == "o"
+    finally:
+        client.close()
+        main_module.app.dependency_overrides.clear()
+        engine.dispose()
+
+
 def test_consistency_route_passes_expected_parameters(monkeypatch, tmp_path) -> None:
     client, user_id, engine = _create_test_client(monkeypatch, tmp_path)
     captured: dict = {}

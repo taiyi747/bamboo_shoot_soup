@@ -49,6 +49,12 @@ interface LaunchKitDto {
   growth_experiment_suggestion_json: unknown
 }
 
+interface LaunchKitDayArticleDto {
+  day_no: number
+  title: string
+  markdown: string
+}
+
 const toErrorMessage = (data: unknown): string => {
   if (!data) {
     return ''
@@ -442,6 +448,27 @@ export const createHttpApiClient = (baseURL: string, getUserId: () => string): A
     })
 
     return { launchKit: mapLaunchKit(launchKit) }
+  },
+
+  async generateLaunchKitDayArticle(input) {
+    const article = await requestJson<LaunchKitDayArticleDto>(baseURL, '/v1/launch-kits/day-articles/generate', {
+      method: 'POST',
+      body: {
+        user_id: getUserId(),
+        identity_model_id: input.identityModel.id,
+        constitution_id: null,
+        day_no: input.dayNo,
+        theme: input.theme,
+        draft_or_outline: input.draftOutline,
+        opening_text: input.opening,
+      },
+    })
+
+    return {
+      dayNo: article.day_no,
+      title: article.title || '',
+      markdown: article.markdown || '',
+    }
   },
 
   async runConsistencyCheck(input) {
