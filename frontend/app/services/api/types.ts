@@ -60,6 +60,21 @@ export interface GenerateLaunchKitResponse {
   launchKit: LaunchKit
 }
 
+export interface GenerateLaunchKitDayArticleRequest {
+  identityModel: IdentityModelCard
+  constitution: PersonaConstitution
+  dayNo: number
+  theme: string
+  draftOutline: string
+  opening: string
+}
+
+export interface GenerateLaunchKitDayArticleResponse {
+  dayNo: number
+  title: string
+  markdown: string
+}
+
 export interface RunConsistencyCheckRequest {
   draft: string
   identityModel: IdentityModelCard
@@ -83,6 +98,9 @@ export interface ApiClient {
     input: GeneratePersonaConstitutionRequest
   ) => Promise<GeneratePersonaConstitutionResponse>
   generateLaunchKit: (input: GenerateLaunchKitRequest) => Promise<GenerateLaunchKitResponse>
+  generateLaunchKitDayArticle: (
+    input: GenerateLaunchKitDayArticleRequest
+  ) => Promise<GenerateLaunchKitDayArticleResponse>
   runConsistencyCheck: (input: RunConsistencyCheckRequest) => Promise<RunConsistencyCheckResponse>
   trackEvent: (input: AnalyticsEventPayload) => Promise<TrackEventResponse>
 }

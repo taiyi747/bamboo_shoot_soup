@@ -97,6 +97,20 @@ def _invalid_launch_kit_payload_missing_outline() -> dict:
     return payload
 
 
+def _valid_launch_kit_day_article_payload(day_no: int = 1) -> dict:
+    return {
+        "day_no": day_no,
+        "title": f"Day {day_no} Title",
+        "markdown": f"# Day {day_no}\n\nBody",
+    }
+
+
+def _invalid_launch_kit_day_article_payload_missing_markdown(day_no: int = 1) -> dict:
+    payload = _valid_launch_kit_day_article_payload(day_no=day_no)
+    payload.pop("markdown")
+    return payload
+
+
 def _identity_model_payload(prefix: str, label: str) -> dict:
     return {
         "models": [
@@ -695,6 +709,61 @@ def test_generate_launch_kit_fails_after_schema_retry_exhaustion(monkeypatch, tm
 
     assert exc_info.value.code == "LLM_SCHEMA_VALIDATION_FAILED"
     assert "after 2 schema repair retries" in exc_info.value.message
+    _close_db(db)
+
+
+def test_generate_launch_kit_day_article_succeeds_without_persistence(monkeypatch, tmp_path) -> None:
+    db, user_id = _make_db_session(tmp_path)
+    fake_client = _FakeLLMClient(
+        {"generate_launch_kit_day_article": _valid_launch_kit_day_article_payload(day_no=1)}
+    )
+    monkeypatch.setattr(launch_kit_service, "get_llm_client", lambda: fake_client)
+
+    article = launch_kit_service.generate_launch_kit_day_article(
+        db=db,
+        user_id=user_id,
+        day_no=1,
+        theme="Theme 1",
+        draft_or_outline="Outline 1",
+        opening_text="Opening 1",
+    )
+
+    assert article.day_no == 1
+    assert article.title == "Day 1 Title"
+    assert article.markdown.startswith("# Day 1")
+    assert db.query(LaunchKit).filter(LaunchKit.user_id == user_id).count() == 0
+    assert len([c for c in fake_client.calls if c["operation"] == "generate_launch_kit_day_article"]) == 1
+    _close_db(db)
+
+
+def test_generate_launch_kit_day_article_retries_schema_then_succeeds(monkeypatch, tmp_path) -> None:
+    db, user_id = _make_db_session(tmp_path)
+    fake_client = _FakeLLMClient(
+        {
+            "generate_launch_kit_day_article": [
+                _invalid_launch_kit_day_article_payload_missing_markdown(day_no=2),
+                _valid_launch_kit_day_article_payload(day_no=2),
+            ]
+        }
+    )
+    monkeypatch.setattr(launch_kit_service, "get_llm_client", lambda: fake_client)
+
+    article = launch_kit_service.generate_launch_kit_day_article(
+        db=db,
+        user_id=user_id,
+        day_no=2,
+        theme="Theme 2",
+        draft_or_outline="Outline 2",
+        opening_text="Opening 2",
+    )
+
+    assert article.day_no == 2
+    assert article.title == "Day 2 Title"
+    assert len([c for c in fake_client.calls if c["operation"] == "generate_launch_kit_day_article"]) == 2
+    assert (
+        "You are repairing an invalid launch-kit day article JSON."
+        in fake_client.calls[1]["system_prompt"]
+    )
     _close_db(db)
 
 

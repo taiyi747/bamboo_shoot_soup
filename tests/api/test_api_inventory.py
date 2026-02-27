@@ -22,6 +22,7 @@ EXPECTED_ROUTES = {
     ("POST", "/v1/risk-boundaries"),
     ("GET", "/v1/risk-boundaries/users/{user_id}"),
     ("POST", "/v1/launch-kits/generate"),
+    ("POST", "/v1/launch-kits/day-articles/generate"),
     ("GET", "/v1/launch-kits/users/{user_id}"),
     ("GET", "/v1/launch-kits/users/{user_id}/latest"),
     ("GET", "/v1/launch-kits/{kit_id}"),
@@ -49,5 +50,5 @@ def _collect_runtime_routes() -> set[tuple[str, str]]:
 
 def test_runtime_routes_match_v1_inventory() -> None:
     runtime_routes = _collect_runtime_routes()
-    assert len(runtime_routes) == 29
+    assert len(runtime_routes) == 30
     assert runtime_routes == EXPECTED_ROUTES

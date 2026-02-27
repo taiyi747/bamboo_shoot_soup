@@ -140,6 +140,39 @@ def test_launch_kit_route_returns_structured_502(monkeypatch, tmp_path) -> None:
         engine.dispose()
 
 
+def test_launch_kit_day_article_route_returns_structured_502(monkeypatch, tmp_path) -> None:
+    client, user_id, engine = _create_test_client(monkeypatch, tmp_path)
+    try:
+        def _raise_error(*_args, **_kwargs):
+            raise LLMServiceError(
+                code="LLM_UPSTREAM_HTTP_ERROR",
+                message="upstream failed",
+                operation="generate_launch_kit_day_article",
+                provider_status=503,
+                provider_request_id="req-launch-day-article",
+                retryable=True,
+                attempts=3,
+            )
+
+        monkeypatch.setattr(launch_kit_service, "generate_launch_kit_day_article", _raise_error)
+        response = client.post(
+            "/v1/launch-kits/day-articles/generate",
+            json={
+                "user_id": user_id,
+                "day_no": 1,
+                "theme": "t",
+                "draft_or_outline": "d",
+                "opening_text": "o",
+            },
+        )
+        assert response.status_code == 502
+        _assert_error_detail_fields(response.json()["detail"])
+    finally:
+        client.close()
+        main_module.app.dependency_overrides.clear()
+        engine.dispose()
+
+
 def test_consistency_route_returns_structured_502(monkeypatch, tmp_path) -> None:
     client, user_id, engine = _create_test_client(monkeypatch, tmp_path)
     try:
